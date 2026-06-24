@@ -1,0 +1,1359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>IMGC Converter</title>
+<style>
+  /* ============================================================
+     TOKENS
+  ============================================================ */
+  :root {
+    --bg:        #0b0d11;
+    --surface:   #13161d;
+    --card:      #181c25;
+    --border:    #252a38;
+    --accent:    #5b8dee;
+    --accent2:   #a78bfa;
+    --success:   #34d399;
+    --error:     #f87171;
+    --warn:      #fbbf24;
+    --text:      #e4e8f0;
+    --muted:     #6b7694;
+    --radius:    16px;
+    --radius-sm: 8px;
+    --mono:      'Courier New', monospace;
+    --sans:      system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --trans:     0.2s ease;
+  }
+
+  /* ============================================================
+     RESET & BASE
+  ============================================================ */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  /* ============================================================
+     NOISE OVERLAY (subtle texture)
+  ============================================================ */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ============================================================
+     LAYOUT
+  ============================================================ */
+  .page { position: relative; z-index: 1; }
+
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 0 20px;
+  }
+
+  /* ============================================================
+     HEADER
+  ============================================================ */
+  header {
+    padding: 48px 20px 32px;
+    text-align: center;
+  }
+
+  .logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .logo-icon {
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    box-shadow: 0 0 24px rgba(91,141,238,0.35);
+  }
+
+  .logo-text {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  header h1 {
+    font-size: clamp(32px, 6vw, 52px);
+    font-weight: 800;
+    letter-spacing: -1.5px;
+    line-height: 1.1;
+    margin-bottom: 14px;
+  }
+
+  header h1 span {
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  header p {
+    color: var(--muted);
+    font-size: 16px;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+
+  /* ============================================================
+     BADGE / FORMAT TAG
+  ============================================================ */
+  .badge {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: rgba(91,141,238,0.15);
+    color: var(--accent);
+    border: 1px solid rgba(91,141,238,0.3);
+  }
+
+  /* ============================================================
+     CONVERTER GRID
+  ============================================================ */
+  .converters {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    padding: 0 20px 40px;
+    max-width: 960px;
+    margin: 0 auto;
+  }
+
+  @media (max-width: 700px) {
+    .converters { grid-template-columns: 1fr; }
+  }
+
+  /* ============================================================
+     CARD
+  ============================================================ */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color var(--trans), box-shadow var(--trans);
+  }
+
+  .card:hover {
+    border-color: rgba(91,141,238,0.3);
+    box-shadow: 0 0 32px rgba(91,141,238,0.08);
+  }
+
+  .card-glow {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    opacity: 0.8;
+    border-radius: var(--radius) var(--radius) 0 0;
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .card-icon {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .card-icon.encode { background: rgba(91,141,238,0.15); }
+  .card-icon.decode { background: rgba(167,139,250,0.15); }
+
+  .card-title {
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+  }
+
+  .card-sub {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  /* ============================================================
+     DROP ZONE
+  ============================================================ */
+  .dropzone {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius-sm);
+    padding: 36px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color var(--trans), background var(--trans);
+    position: relative;
+  }
+
+  .dropzone:hover,
+  .dropzone.drag-over {
+    border-color: var(--accent);
+    background: rgba(91,141,238,0.04);
+  }
+
+  .dropzone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  .dropzone-icon { font-size: 36px; margin-bottom: 10px; }
+
+  .dropzone-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+
+  .dropzone-hint {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  /* ============================================================
+     PREVIEW
+  ============================================================ */
+  .preview-wrap {
+    margin-top: 18px;
+    display: none;
+    animation: fadeIn 0.3s ease;
+  }
+
+  .preview-wrap.visible { display: block; }
+
+  .preview-img {
+    width: 100%;
+    max-height: 200px;
+    object-fit: contain;
+    border-radius: var(--radius-sm);
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+  }
+
+  /* ============================================================
+     META TABLE
+  ============================================================ */
+  .meta-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  .meta-item {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+  }
+
+  .meta-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .meta-value {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    word-break: break-all;
+  }
+
+  /* ============================================================
+     PROGRESS BAR
+  ============================================================ */
+  .progress-wrap {
+    margin-top: 16px;
+    display: none;
+  }
+
+  .progress-wrap.visible { display: block; }
+
+  .progress-label {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .progress-track {
+    height: 6px;
+    background: var(--border);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+
+  .progress-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 999px;
+    transition: width 0.4s ease;
+  }
+
+  /* ============================================================
+     BUTTONS
+  ============================================================ */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 11px 20px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--trans);
+    border: none;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(91,141,238,0.3);
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(91,141,238,0.45);
+  }
+
+  .btn-ghost {
+    background: rgba(255,255,255,0.05);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+
+  .btn-ghost:hover {
+    background: rgba(255,255,255,0.09);
+    border-color: rgba(91,141,238,0.4);
+  }
+
+  .btn-success {
+    background: rgba(52,211,153,0.15);
+    color: var(--success);
+    border: 1px solid rgba(52,211,153,0.25);
+  }
+
+  .btn-success:hover {
+    background: rgba(52,211,153,0.22);
+  }
+
+  .btn-group {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+  }
+
+  /* ============================================================
+     CONVERT ACTION ROW
+  ============================================================ */
+  .convert-row {
+    margin-top: 18px;
+    display: none;
+  }
+
+  .convert-row.visible { display: block; }
+
+  /* ============================================================
+     RESULT BOX
+  ============================================================ */
+  .result-box {
+    margin-top: 16px;
+    padding: 14px 16px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: rgba(52,211,153,0.05);
+    display: none;
+    animation: fadeIn 0.3s ease;
+  }
+
+  .result-box.visible { display: block; }
+  .result-box.error-box { background: rgba(248,113,113,0.07); border-color: rgba(248,113,113,0.25); }
+
+  .result-title {
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .result-detail {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.8;
+  }
+
+  /* ============================================================
+     SPINNER
+  ============================================================ */
+  .spinner {
+    display: none;
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(255,255,255,0.2);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+  }
+
+  .spinner.visible { display: inline-block; }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ============================================================
+     TOAST
+  ============================================================ */
+  #toast-container {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none;
+  }
+
+  .toast {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    animation: slideUp 0.3s ease, fadeOut 0.4s ease 2.6s forwards;
+    pointer-events: auto;
+    max-width: 300px;
+  }
+
+  .toast.success { border-color: rgba(52,211,153,0.4); }
+  .toast.error   { border-color: rgba(248,113,113,0.4); }
+  .toast.info    { border-color: rgba(91,141,238,0.4); }
+
+  .toast-icon { font-size: 16px; flex-shrink: 0; }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fadeOut {
+    from { opacity: 1; }
+    to   { opacity: 0; pointer-events: none; }
+  }
+
+  /* ============================================================
+     SUCCESS CHECKMARK ANIMATION
+  ============================================================ */
+  .checkmark {
+    display: inline-block;
+    color: var(--success);
+    animation: pop 0.4s cubic-bezier(0.175,0.885,0.32,1.275);
+  }
+
+  @keyframes pop {
+    from { transform: scale(0); }
+    to   { transform: scale(1); }
+  }
+
+  /* ============================================================
+     ABOUT SECTION
+  ============================================================ */
+  .about {
+    max-width: 960px;
+    margin: 0 auto 60px;
+    padding: 0 20px;
+  }
+
+  .about-inner {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 36px 40px;
+  }
+
+  @media (max-width: 600px) {
+    .about-inner { padding: 24px 20px; }
+  }
+
+  .about-title {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    margin-bottom: 8px;
+  }
+
+  .about-sub {
+    color: var(--muted);
+    font-size: 14px;
+    margin-bottom: 28px;
+  }
+
+  .how-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+  }
+
+  .how-item {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 18px;
+  }
+
+  .how-num {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    margin-bottom: 8px;
+    font-weight: 700;
+  }
+
+  .how-name {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+
+  .how-desc {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  /* ============================================================
+     FORMAT PREVIEW
+  ============================================================ */
+  .format-block {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 18px 20px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.9;
+    margin-top: 24px;
+  }
+
+  .format-block .hl { color: var(--accent); }
+  .format-block .hl2 { color: var(--accent2); }
+  .format-block .hl3 { color: var(--success); }
+
+  /* ============================================================
+     DIVIDER
+  ============================================================ */
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 28px 0;
+  }
+
+  /* ============================================================
+     FOOTER
+  ============================================================ */
+  footer {
+    text-align: center;
+    padding: 24px;
+    font-size: 12px;
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+  }
+
+  footer span { color: var(--accent); }
+
+  /* ============================================================
+     UTILS
+  ============================================================ */
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ══════════════════════════════════════════
+       HEADER
+  ══════════════════════════════════════════ -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">📦</div>
+      <div class="logo-text">IMGC</div>
+    </div>
+    <h1>IMGC <span>Converter</span></h1>
+    <p>Convert images into custom <code style="font-family:var(--mono);color:var(--accent)">.imgc</code> files — and restore them back again.</p>
+  </header>
+
+  <!-- ══════════════════════════════════════════
+       CONVERTER CARDS
+  ══════════════════════════════════════════ -->
+  <div class="converters">
+
+    <!-- ─── ENCODE: Image → IMGC ─── -->
+    <div class="card" id="encode-card">
+      <div class="card-glow"></div>
+      <div class="card-header">
+        <div class="card-icon encode">🖼️</div>
+        <div>
+          <div class="card-title">Image → IMGC</div>
+          <div class="card-sub">Pack any image into a .imgc file</div>
+        </div>
+      </div>
+
+      <!-- Drop zone -->
+      <div class="dropzone" id="encode-drop">
+        <input type="file" id="encode-input" accept=".png,.jpg,.jpeg,.webp" />
+        <div class="dropzone-icon">📂</div>
+        <div class="dropzone-label">Drop an image here</div>
+        <div class="dropzone-hint">PNG, JPG, JPEG, WEBP — or click to browse</div>
+      </div>
+
+      <!-- Preview -->
+      <div class="preview-wrap" id="encode-preview-wrap">
+        <img class="preview-img" id="encode-img-preview" alt="Preview" />
+        <div class="meta-grid" id="encode-meta"></div>
+      </div>
+
+      <!-- Progress -->
+      <div class="progress-wrap" id="encode-progress-wrap">
+        <div class="progress-label">
+          <span id="encode-progress-label">Converting…</span>
+          <span id="encode-progress-pct">0%</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-bar" id="encode-progress-bar"></div>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="convert-row" id="encode-actions">
+        <div class="btn-group">
+          <button class="btn btn-primary" id="encode-btn">
+            <div class="spinner" id="encode-spinner"></div>
+            <span id="encode-btn-label">⚡ Convert to IMGC</span>
+          </button>
+          <button class="btn btn-ghost" id="encode-reset">✕ Reset</button>
+        </div>
+      </div>
+
+      <!-- Result -->
+      <div class="result-box" id="encode-result">
+        <div class="result-title"><span class="checkmark" id="encode-check"></span> <span id="encode-result-title"></span></div>
+        <div class="result-detail" id="encode-result-detail"></div>
+        <div class="btn-group" style="margin-top:12px">
+          <button class="btn btn-success" id="encode-download">⬇ Download IMGC</button>
+        </div>
+      </div>
+
+      <div class="result-box error-box" id="encode-error">
+        <div class="result-title" style="color:var(--error)">⚠ Error</div>
+        <div class="result-detail" id="encode-error-msg"></div>
+      </div>
+    </div>
+
+    <!-- ─── DECODE: IMGC → Image ─── -->
+    <div class="card" id="decode-card">
+      <div class="card-glow" style="background:linear-gradient(90deg,var(--accent2),var(--accent))"></div>
+      <div class="card-header">
+        <div class="card-icon decode">📦</div>
+        <div>
+          <div class="card-title">IMGC → Image</div>
+          <div class="card-sub">Extract the original image from a .imgc</div>
+        </div>
+      </div>
+
+      <!-- Drop zone -->
+      <div class="dropzone" id="decode-drop">
+        <input type="file" id="decode-input" accept=".imgc" />
+        <div class="dropzone-icon">📦</div>
+        <div class="dropzone-label">Drop an .imgc file here</div>
+        <div class="dropzone-hint">Only .imgc files accepted — or click to browse</div>
+      </div>
+
+      <!-- Preview -->
+      <div class="preview-wrap" id="decode-preview-wrap">
+        <img class="preview-img" id="decode-img-preview" alt="Restored preview" />
+        <div class="meta-grid" id="decode-meta"></div>
+      </div>
+
+      <!-- Progress -->
+      <div class="progress-wrap" id="decode-progress-wrap">
+        <div class="progress-label">
+          <span id="decode-progress-label">Decoding…</span>
+          <span id="decode-progress-pct">0%</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-bar" id="decode-progress-bar"></div>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="convert-row" id="decode-actions">
+        <div class="btn-group">
+          <button class="btn btn-primary" id="decode-btn" style="background:linear-gradient(135deg,var(--accent2),var(--accent))">
+            <div class="spinner" id="decode-spinner"></div>
+            <span id="decode-btn-label">🔓 Decode IMGC</span>
+          </button>
+          <button class="btn btn-ghost" id="decode-reset">✕ Reset</button>
+        </div>
+      </div>
+
+      <!-- Result -->
+      <div class="result-box" id="decode-result">
+        <div class="result-title"><span class="checkmark" id="decode-check"></span> <span id="decode-result-title"></span></div>
+        <div class="result-detail" id="decode-result-detail"></div>
+        <div class="btn-group" style="margin-top:12px">
+          <button class="btn btn-success" id="decode-download">⬇ Download Image</button>
+          <button class="btn btn-ghost" id="decode-newtab">↗ Open in Tab</button>
+        </div>
+      </div>
+
+      <div class="result-box error-box" id="decode-error">
+        <div class="result-title" style="color:var(--error)">⚠ Error</div>
+        <div class="result-detail" id="decode-error-msg"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       ABOUT / HOW IT WORKS
+  ══════════════════════════════════════════ -->
+  <div class="about">
+    <div class="about-inner">
+      <div class="about-title">What is .imgc?</div>
+      <div class="about-sub">A lightweight, human-readable custom image container format — no binary, no magic bytes, just structured text.</div>
+
+      <div class="how-grid">
+        <div class="how-item">
+          <div class="how-num">STEP 01</div>
+          <div class="how-name">Pick an image</div>
+          <div class="how-desc">Drop any PNG, JPG, JPEG, or WEBP file into the encoder.</div>
+        </div>
+        <div class="how-item">
+          <div class="how-num">STEP 02</div>
+          <div class="how-name">Pack into .imgc</div>
+          <div class="how-desc">The browser encodes the image as Base64 and wraps it in a structured text header.</div>
+        </div>
+        <div class="how-item">
+          <div class="how-num">STEP 03</div>
+          <div class="how-name">Download & share</div>
+          <div class="how-desc">Save the .imgc file. It carries all metadata and can be restored later.</div>
+        </div>
+        <div class="how-item">
+          <div class="how-num">STEP 04</div>
+          <div class="how-name">Restore anytime</div>
+          <div class="how-desc">Drop the .imgc into the decoder to extract the original image back out.</div>
+        </div>
+      </div>
+
+      <hr class="divider" />
+
+      <div style="font-size:13px;font-weight:700;margin-bottom:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;">File Format</div>
+      <div class="format-block">
+        <span class="hl">IMGC-V1</span><br/>
+        filename=<span class="hl2">photo.png</span><br/>
+        created=<span class="hl2">1719196800000</span><br/>
+        type=<span class="hl2">image/png</span><br/>
+        width=<span class="hl2">1920</span><br/>
+        height=<span class="hl2">1080</span><br/>
+        <br/>
+        <span class="hl">DATA_START</span><br/>
+        <span class="hl3">iVBORw0KGgoAAAANS...</span><br/>
+        <span class="hl">DATA_END</span>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    All processing happens <span>entirely in your browser</span> — no files are uploaded to any server.
+  </footer>
+</div>
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+<script>
+/* ============================================================
+   IMGC CONVERTER — Main Script
+   All processing: FileReader, Canvas, Blob, URL.createObjectURL
+============================================================ */
+
+'use strict';
+
+/* ─── State ─── */
+const state = {
+  encode: {
+    file: null,
+    dataURL: null,
+    imgcContent: null,
+    outputFilename: null,
+    width: 0, height: 0
+  },
+  decode: {
+    file: null,
+    dataURL: null,   // restored image data URL
+    outputFilename: null,
+    outputMime: null
+  }
+};
+
+/* ─── DOM helpers ─── */
+const $ = id => document.getElementById(id);
+const show = el => { if (el) el.classList.add('visible'); };
+const hide = el => { if (el) el.classList.remove('visible'); };
+const showEl = el => { if (el) el.style.display = ''; };
+const hideEl = el => { if (el) el.style.display = 'none'; };
+
+/* ─── File size formatter ─── */
+function fmtSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+}
+
+/* ─── Timestamp formatter ─── */
+function fmtDate(ts) {
+  return new Date(Number(ts)).toLocaleString();
+}
+
+/* ─── Build meta item HTML ─── */
+function metaItem(label, value) {
+  return `<div class="meta-item">
+    <div class="meta-label">${label}</div>
+    <div class="meta-value">${value}</div>
+  </div>`;
+}
+
+/* ──────────────────────────────────────────────────
+   TOAST
+────────────────────────────────────────────────── */
+function toast(msg, type = 'info') {
+  const icons = { success: '✅', error: '❌', info: 'ℹ️' };
+  const tc = $('toast-container');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span class="toast-icon">${icons[type]}</span><span>${msg}</span>`;
+  tc.appendChild(el);
+  setTimeout(() => { el.remove(); }, 3100);
+}
+
+/* ──────────────────────────────────────────────────
+   ANIMATED PROGRESS HELPER
+────────────────────────────────────────────────── */
+function animateProgress(barId, pctId, wrapId, labelId, fromPct, toPct, durationMs, labelText) {
+  return new Promise(resolve => {
+    const bar   = $(barId);
+    const pct   = $(pctId);
+    const wrap  = $(wrapId);
+    const label = $(labelId);
+
+    if (label) label.textContent = labelText || 'Processing…';
+    show(wrap);
+
+    const start = performance.now();
+    const range = toPct - fromPct;
+
+    function step(now) {
+      const elapsed = now - start;
+      const progress = Math.min(elapsed / durationMs, 1);
+      const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+      const current = fromPct + range * eased;
+
+      if (bar) bar.style.width = current + '%';
+      if (pct) pct.textContent = Math.round(current) + '%';
+
+      if (progress < 1) {
+        requestAnimationFrame(step);
+      } else {
+        resolve();
+      }
+    }
+    requestAnimationFrame(step);
+  });
+}
+
+/* ──────────────────────────────────────────────────
+   GET IMAGE DIMENSIONS FROM dataURL
+────────────────────────────────────────────────── */
+function getImageDimensions(dataURL) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    img.onerror = () => reject(new Error('Failed to load image for dimension check'));
+    img.src = dataURL;
+  });
+}
+
+/* ──────────────────────────────────────────────────
+   DRAG & DROP SETUP
+────────────────────────────────────────────────── */
+function setupDrop(zoneId, inputId, callback) {
+  const zone  = $(zoneId);
+  const input = $(inputId);
+
+  ['dragenter', 'dragover'].forEach(evt => {
+    zone.addEventListener(evt, e => {
+      e.preventDefault();
+      zone.classList.add('drag-over');
+    });
+  });
+
+  ['dragleave', 'drop'].forEach(evt => {
+    zone.addEventListener(evt, e => {
+      e.preventDefault();
+      zone.classList.remove('drag-over');
+    });
+  });
+
+  zone.addEventListener('drop', e => {
+    const files = e.dataTransfer?.files;
+    if (files && files[0]) callback(files[0]);
+  });
+
+  input.addEventListener('change', e => {
+    if (e.target.files[0]) callback(e.target.files[0]);
+  });
+}
+
+/* ══════════════════════════════════════════════════
+   ENCODER  (Image → IMGC)
+══════════════════════════════════════════════════ */
+
+function clearEncodeResult() {
+  hide($('encode-result'));
+  hide($('encode-error'));
+  $('encode-result-detail').textContent = '';
+  state.encode.imgcContent = null;
+}
+
+function showEncodeError(msg) {
+  const el = $('encode-error');
+  $('encode-error-msg').textContent = msg;
+  show(el);
+  hide($('encode-result'));
+  toast(msg, 'error');
+}
+
+async function handleEncodeFile(file) {
+  // Validate type
+  const allowed = ['image/png', 'image/jpeg', 'image/webp'];
+  if (!allowed.includes(file.type)) {
+    showEncodeError(`Unsupported file type: ${file.type || '(unknown)'}. Please use PNG, JPG, JPEG, or WEBP.`);
+    return;
+  }
+
+  state.encode.file = file;
+  clearEncodeResult();
+  hide($('encode-progress-wrap'));
+
+  // Read as dataURL
+  const dataURL = await readFileAsDataURL(file);
+  state.encode.dataURL = dataURL;
+
+  // Get dimensions
+  let dims;
+  try {
+    dims = await getImageDimensions(dataURL);
+  } catch {
+    showEncodeError('Could not read image dimensions. The file may be corrupted.');
+    return;
+  }
+  state.encode.width  = dims.width;
+  state.encode.height = dims.height;
+
+  // Show preview
+  $('encode-img-preview').src = dataURL;
+  $('encode-meta').innerHTML =
+    metaItem('Filename',   file.name) +
+    metaItem('Type',       file.type) +
+    metaItem('Size',       fmtSize(file.size)) +
+    metaItem('Dimensions', `${dims.width} × ${dims.height}`);
+
+  show($('encode-preview-wrap'));
+  show($('encode-actions'));
+}
+
+async function runEncode() {
+  if (!state.encode.file || !state.encode.dataURL) return;
+
+  // Lock UI
+  const btn   = $('encode-btn');
+  const lbl   = $('encode-btn-label');
+  const spnr  = $('encode-spinner');
+  btn.disabled = true;
+  lbl.textContent = 'Converting…';
+  show(spnr);
+  clearEncodeResult();
+
+  const t0 = performance.now();
+
+  try {
+    // Animate progress: 0 → 40% (reading phase simulation)
+    await animateProgress('encode-progress-bar','encode-progress-pct','encode-progress-wrap','encode-progress-label', 0, 40, 400, 'Reading image data…');
+
+    // Extract base64 (strip data URL prefix)
+    const base64 = state.encode.dataURL.split(',')[1];
+
+    // Animate 40 → 75%
+    await animateProgress('encode-progress-bar','encode-progress-pct','encode-progress-wrap','encode-progress-label', 40, 75, 350, 'Building IMGC structure…');
+
+    const file     = state.encode.file;
+    const ts       = Date.now();
+    const filename = file.name;
+
+    // Build IMGC content
+    const imgcContent = [
+      'IMGC-V1',
+      `filename=${filename}`,
+      `created=${ts}`,
+      `type=${file.type}`,
+      `width=${state.encode.width}`,
+      `height=${state.encode.height}`,
+      '',
+      'DATA_START',
+      base64,
+      'DATA_END'
+    ].join('\n');
+
+    state.encode.imgcContent  = imgcContent;
+    state.encode.outputFilename = filename.replace(/\.[^.]+$/, '') + '.imgc';
+
+    // Animate 75 → 100%
+    await animateProgress('encode-progress-bar','encode-progress-pct','encode-progress-wrap','encode-progress-label', 75, 100, 300, 'Finalising…');
+
+    const elapsed = ((performance.now() - t0) / 1000).toFixed(2);
+    const outSize = new Blob([imgcContent]).size;
+
+    // Show result
+    const resEl = $('encode-result');
+    $('encode-check').textContent = '✅';
+    $('encode-result-title').textContent = 'Conversion complete!';
+    $('encode-result-detail').innerHTML =
+      `Output file: <strong>${state.encode.outputFilename}</strong>\n` +
+      `Output size: ${fmtSize(outSize)}\n` +
+      `Time: ${elapsed}s`;
+    show(resEl);
+    toast('Image converted to IMGC!', 'success');
+
+  } catch (err) {
+    showEncodeError('Conversion failed: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    lbl.textContent = '⚡ Convert to IMGC';
+    hide(spnr);
+  }
+}
+
+function downloadEncode() {
+  if (!state.encode.imgcContent || !state.encode.outputFilename) return;
+  const blob = new Blob([state.encode.imgcContent], { type: 'text/plain' });
+  triggerDownload(URL.createObjectURL(blob), state.encode.outputFilename);
+  toast('IMGC file downloaded!', 'success');
+}
+
+function resetEncode() {
+  state.encode = { file:null, dataURL:null, imgcContent:null, outputFilename:null, width:0, height:0 };
+  $('encode-input').value = '';
+  hide($('encode-preview-wrap'));
+  hide($('encode-actions'));
+  hide($('encode-progress-wrap'));
+  clearEncodeResult();
+}
+
+/* ══════════════════════════════════════════════════
+   DECODER  (IMGC → Image)
+══════════════════════════════════════════════════ */
+
+function clearDecodeResult() {
+  hide($('decode-result'));
+  hide($('decode-error'));
+  $('decode-result-detail').textContent = '';
+  state.decode.dataURL = null;
+  state.decode.outputFilename = null;
+  state.decode.outputMime = null;
+}
+
+function showDecodeError(msg) {
+  const el = $('decode-error');
+  $('decode-error-msg').textContent = msg;
+  show(el);
+  hide($('decode-result'));
+  toast(msg, 'error');
+}
+
+async function handleDecodeFile(file) {
+  // Extension check
+  if (!file.name.endsWith('.imgc')) {
+    showDecodeError('Invalid file extension. Only .imgc files are accepted.');
+    return;
+  }
+
+  state.decode.file = file;
+  clearDecodeResult();
+  hide($('decode-progress-wrap'));
+  hide($('decode-preview-wrap'));
+  show($('decode-actions'));
+}
+
+async function runDecode() {
+  if (!state.decode.file) return;
+
+  const btn  = $('decode-btn');
+  const lbl  = $('decode-btn-label');
+  const spnr = $('decode-spinner');
+  btn.disabled = true;
+  lbl.textContent = 'Decoding…';
+  show(spnr);
+  clearDecodeResult();
+
+  const t0 = performance.now();
+
+  try {
+    await animateProgress('decode-progress-bar','decode-progress-pct','decode-progress-wrap','decode-progress-label', 0, 30, 350, 'Reading .imgc file…');
+
+    const text = await readFileAsText(state.decode.file);
+
+    // ─── Validation ───
+    if (!text || text.trim() === '') {
+      throw new Error('The file is empty.');
+    }
+    if (!text.startsWith('IMGC-V1')) {
+      throw new Error('Invalid IMGC header. Expected "IMGC-V1" at the start of the file.');
+    }
+    if (!text.includes('DATA_START')) {
+      throw new Error('Missing DATA_START marker. The file may be corrupted or incomplete.');
+    }
+    if (!text.includes('DATA_END')) {
+      throw new Error('Missing DATA_END marker. The file appears to be incomplete.');
+    }
+
+    await animateProgress('decode-progress-bar','decode-progress-pct','decode-progress-wrap','decode-progress-label', 30, 60, 300, 'Parsing metadata…');
+
+    // ─── Parse metadata ───
+    const lines    = text.split('\n');
+    const meta     = {};
+    let   inHeader = true;
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed === 'DATA_START') { inHeader = false; break; }
+      if (trimmed.includes('=')) {
+        const [k, ...v] = trimmed.split('=');
+        meta[k.trim()] = v.join('=').trim();
+      }
+    }
+
+    // Extract base64
+    const dataStartIdx = text.indexOf('DATA_START\n') + 'DATA_START\n'.length;
+    const dataEndIdx   = text.indexOf('\nDATA_END');
+    if (dataEndIdx <= dataStartIdx) {
+      throw new Error('Could not extract image data. The file content between DATA_START and DATA_END is malformed.');
+    }
+
+    const base64 = text.substring(dataStartIdx, dataEndIdx).trim();
+
+    if (!base64 || base64.length < 20) {
+      throw new Error('Image data is missing or too short to be valid.');
+    }
+
+    await animateProgress('decode-progress-bar','decode-progress-pct','decode-progress-wrap','decode-progress-label', 60, 85, 300, 'Rebuilding image…');
+
+    // ─── Rebuild image ───
+    const mimeType = meta['type'] || 'image/png';
+    const dataURL  = `data:${mimeType};base64,${base64}`;
+
+    // Validate the base64 actually decodes to a real image
+    await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = resolve;
+      img.onerror = () => reject(new Error('Base64 data could not be decoded into a valid image.'));
+      img.src = dataURL;
+    });
+
+    state.decode.dataURL        = dataURL;
+    state.decode.outputMime     = mimeType;
+    const ext = mimeType.split('/')[1] || 'png';
+    state.decode.outputFilename = (meta['filename'] || 'restored') ;
+
+    await animateProgress('decode-progress-bar','decode-progress-pct','decode-progress-wrap','decode-progress-label', 85, 100, 250, 'Done!');
+
+    // ─── Display ───
+    $('decode-img-preview').src = dataURL;
+
+    const restoredSize = Math.round(base64.length * 0.75); // approx decoded bytes
+    $('decode-meta').innerHTML =
+      metaItem('Original file',  meta['filename'] || '—') +
+      metaItem('Type',           meta['type']     || '—') +
+      metaItem('Dimensions',     meta['width'] && meta['height'] ? `${meta['width']} × ${meta['height']}` : '—') +
+      metaItem('Created',        meta['created'] ? fmtDate(meta['created']) : '—') +
+      metaItem('Approx size',    fmtSize(restoredSize)) +
+      metaItem('IMGC size',      fmtSize(state.decode.file.size));
+
+    show($('decode-preview-wrap'));
+
+    const elapsed = ((performance.now() - t0) / 1000).toFixed(2);
+    $('decode-check').textContent  = '✅';
+    $('decode-result-title').textContent = 'Image restored!';
+    $('decode-result-detail').innerHTML =
+      `Restored as: <strong>${state.decode.outputFilename}</strong>\n` +
+      `Approx size: ${fmtSize(restoredSize)}\n` +
+      `Time: ${elapsed}s`;
+    show($('decode-result'));
+    toast('Image restored from IMGC!', 'success');
+
+  } catch (err) {
+    showDecodeError(err.message);
+  } finally {
+    btn.disabled = false;
+    lbl.textContent = '🔓 Decode IMGC';
+    hide(spnr);
+  }
+}
+
+function downloadDecode() {
+  if (!state.decode.dataURL || !state.decode.outputFilename) return;
+  triggerDownload(state.decode.dataURL, state.decode.outputFilename);
+  toast('Image downloaded!', 'success');
+}
+
+function openInNewTab() {
+  if (!state.decode.dataURL) return;
+  const win = window.open();
+  win.document.write(`<img src="${state.decode.dataURL}" style="max-width:100%;display:block;margin:auto;background:#111;" />`);
+  win.document.title = state.decode.outputFilename || 'Restored Image';
+}
+
+function resetDecode() {
+  state.decode = { file:null, dataURL:null, outputFilename:null, outputMime:null };
+  $('decode-input').value = '';
+  hide($('decode-preview-wrap'));
+  hide($('decode-actions'));
+  hide($('decode-progress-wrap'));
+  clearDecodeResult();
+}
+
+/* ──────────────────────────────────────────────────
+   FILE UTILITIES
+────────────────────────────────────────────────── */
+function readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload  = e => resolve(e.target.result);
+    fr.onerror = () => reject(new Error('FileReader failed to read the file.'));
+    fr.readAsDataURL(file);
+  });
+}
+
+function readFileAsText(file) {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload  = e => resolve(e.target.result);
+    fr.onerror = () => reject(new Error('FileReader failed to read the file.'));
+    fr.readAsText(file);
+  });
+}
+
+function triggerDownload(url, filename) {
+  const a = document.createElement('a');
+  a.href     = url;
+  a.download = filename;
+  a.click();
+}
+
+/* ──────────────────────────────────────────────────
+   EVENT WIRING
+────────────────────────────────────────────────── */
+
+// Encode
+setupDrop('encode-drop', 'encode-input', handleEncodeFile);
+$('encode-btn').addEventListener('click',      runEncode);
+$('encode-download').addEventListener('click', downloadEncode);
+$('encode-reset').addEventListener('click',    resetEncode);
+
+// Decode
+setupDrop('decode-drop', 'decode-input', handleDecodeFile);
+$('decode-btn').addEventListener('click',      runDecode);
+$('decode-download').addEventListener('click', downloadDecode);
+$('decode-newtab').addEventListener('click',   openInNewTab);
+$('decode-reset').addEventListener('click',    resetDecode);
+
+</script>
+</body>
+</html>
