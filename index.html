@@ -781,6 +781,11 @@ footer span{color:var(--cyan);}
   .tab{padding:8px 12px;font-size:10px;letter-spacing:1px;}
   .btn{padding:9px 14px;font-size:10px;}
 }
+
+#fn-input-wrap:focus-within{
+  border-color:var(--cyan);
+  box-shadow:0 0 0 1px var(--cyan), inset 0 0 12px rgba(0,245,255,0.04);
+}
 </style>
 </head>
 <body>
@@ -1084,6 +1089,80 @@ footer span{color:var(--cyan);}
 
 </div><!-- /page -->
 
+<!-- ══════════════════════════════════════════
+     FILENAME MODAL
+══════════════════════════════════════════ -->
+<div id="fn-overlay" style="
+  display:none;
+  position:fixed;inset:0;
+  background:rgba(4,5,10,0.85);
+  backdrop-filter:blur(4px);
+  z-index:10000;
+  align-items:center;
+  justify-content:center;
+">
+  <div id="fn-modal" style="
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:var(--r-lg);
+    padding:28px 28px 24px;
+    width:min(420px,90vw);
+    position:relative;
+    animation:fadeIn 0.2s ease;
+  ">
+    <!-- top accent line -->
+    <div style="position:absolute;top:0;left:20px;right:20px;height:1px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);"></div>
+    <!-- corner accents -->
+    <div style="position:absolute;top:-1px;left:-1px;width:12px;height:12px;border-top:2px solid var(--magenta);border-left:2px solid var(--magenta);border-radius:var(--r-lg) 0 0 0;"></div>
+    <div style="position:absolute;bottom:-1px;right:-1px;width:12px;height:12px;border-bottom:2px solid var(--magenta);border-right:2px solid var(--magenta);border-radius:0 0 var(--r-lg) 0;"></div>
+
+    <div style="font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:16px;">▸ Name Your File</div>
+
+    <div style="font-size:13px;color:var(--text);margin-bottom:14px;" id="fn-modal-desc">Enter filename:</div>
+
+    <!-- Input row -->
+    <div style="display:flex;align-items:center;gap:0;border:1px solid var(--border);border-radius:var(--r);overflow:hidden;background:var(--void);transition:border-color 0.2s;" id="fn-input-wrap">
+      <input
+        id="fn-input"
+        type="text"
+        autocomplete="off"
+        spellcheck="false"
+        style="
+          flex:1;
+          background:transparent;
+          border:none;
+          outline:none;
+          color:var(--cyan);
+          font-family:var(--mono);
+          font-size:14px;
+          padding:11px 14px;
+          letter-spacing:0.5px;
+        "
+      />
+      <span id="fn-ext-badge" style="
+        font-family:var(--mono);
+        font-size:13px;
+        font-weight:700;
+        color:var(--magenta);
+        padding:0 14px 0 0;
+        white-space:nowrap;
+        user-select:none;
+      ">.frd</span>
+    </div>
+
+    <!-- Hint -->
+    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:8px;" id="fn-hint">
+      Letters, numbers, hyphens and underscores only.
+    </div>
+
+    <!-- Buttons -->
+    <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end;">
+      <button class="btn btn-ghost" id="fn-cancel" style="padding:9px 18px;">CANCEL</button>
+      <button class="btn btn-solid" id="fn-confirm" style="padding:9px 18px;">⬇ DOWNLOAD</button>
+    </div>
+  </div>
+</div>
+
 <footer>
   100% client-side — <span>zero server contact</span> — FileReader · Canvas · Blob · createObjectURL
 </footer>
@@ -1245,13 +1324,12 @@ function highlightFRD(txt){
     .join('\n');
 }
 
-/* ─── Download trigger — uses Blob with octet-stream to force correct extension ─── */
+/* ─── Core download (fires after name confirmed) ─── */
 function triggerDL(content, filename, isText=true){
   let blob;
   if(isText){
     blob = new Blob([content], {type:'application/octet-stream'});
   } else {
-    // content is already a data URL for images
     const [header,b64]=content.split(',');
     const mime=header.split(':')[1].split(';')[0];
     const byteStr=atob(b64);
@@ -1261,13 +1339,64 @@ function triggerDL(content, filename, isText=true){
   }
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
-  a.href=url;
-  a.download=filename;
-  document.body.appendChild(a);
-  a.click();
+  a.href=url; a.download=filename;
+  document.body.appendChild(a); a.click();
   document.body.removeChild(a);
   setTimeout(()=>URL.revokeObjectURL(url),5000);
 }
+
+/* ─── Filename modal ─── */
+// pending download state
+let _dlPending = null;
+
+function askAndDownload(content, defaultName, isText, ext, description){
+  // Strip extension from default name for the input field
+  const base = defaultName.replace(/\.[^.]+$/, '');
+  $('fn-input').value = base;
+  $('fn-ext-badge').textContent = ext;      // e.g. ".frd" or ".png"
+  $('fn-modal-desc').textContent = description || 'Enter a filename:';
+  $('fn-hint').textContent = 'Letters, numbers, hyphens and underscores only.';
+
+  _dlPending = { content, isText, ext };
+
+  const overlay = $('fn-overlay');
+  overlay.style.display = 'flex';
+  // focus & select all text in input
+  setTimeout(()=>{ $('fn-input').focus(); $('fn-input').select(); }, 60);
+}
+
+function closeModal(){ $('fn-overlay').style.display='none'; _dlPending=null; }
+
+function confirmDownload(){
+  if(!_dlPending) return;
+  let name = $('fn-input').value.trim();
+  if(!name){
+    $('fn-hint').textContent='⚠ Please enter a filename.';
+    $('fn-hint').style.color='var(--red)';
+    $('fn-input').focus();
+    return;
+  }
+  // Sanitise — keep alphanumeric, dash, underscore, dot
+  name = name.replace(/[^a-zA-Z0-9._\-]/g, '_');
+  // Ensure correct extension
+  if(!name.endsWith(_dlPending.ext)) name = name.replace(/\.[^.]*$/, '') + _dlPending.ext;
+  const full = name;
+  closeModal();
+  triggerDL(_dlPending.content, full, _dlPending.isText);
+  toast('Downloaded: ' + full, 'ok');
+}
+
+// Modal button wiring
+$('fn-confirm').addEventListener('click', confirmDownload);
+$('fn-cancel').addEventListener('click', closeModal);
+$('fn-overlay').addEventListener('click', e=>{ if(e.target===$('fn-overlay')) closeModal(); });
+$('fn-input').addEventListener('keydown', e=>{
+  if(e.key==='Enter') confirmDownload();
+  if(e.key==='Escape') closeModal();
+  // reset hint colour on typing
+  $('fn-hint').style.color='';
+  $('fn-hint').textContent='Letters, numbers, hyphens and underscores only.';
+});
 
 /* ─── Drop zone setup ─── */
 function setupDrop(zoneId, inputId, cb){
@@ -1379,8 +1508,7 @@ $('enc-btn').addEventListener('click', async ()=>{
 
 $('enc-dl').addEventListener('click',()=>{
   if(!S.enc.frdContent) return;
-  triggerDL(S.enc.frdContent, S.enc.outName, true);
-  toast('Downloaded: '+S.enc.outName,'ok');
+  askAndDownload(S.enc.frdContent, S.enc.outName, true, '.frd', 'Name your .frd file:');
 });
 
 $('enc-reset').addEventListener('click',()=>{
@@ -1492,8 +1620,7 @@ $('batch-btn').addEventListener('click', async ()=>{
     b.className='btn btn-green';
     b.textContent='⬇ '+r.outName;
     b.addEventListener('click',()=>{
-      triggerDL(r.frd, r.outName, true);
-      toast('Downloaded: '+r.outName,'ok');
+      askAndDownload(r.frd, r.outName, true, '.frd', 'Name your .frd file:');
     });
     dlGroup.appendChild(b);
   });
@@ -1616,8 +1743,8 @@ $('dec-btn').addEventListener('click', async ()=>{
 
 $('dec-dl').addEventListener('click',()=>{
   if(!S.dec.dataURL||!S.dec.outName) return;
-  triggerDL(S.dec.dataURL, S.dec.outName, false);
-  toast('Downloaded: '+S.dec.outName,'ok');
+  const ext = '.'+( S.dec.outMime ? S.dec.outMime.split('/')[1] : 'png' );
+  askAndDownload(S.dec.dataURL, S.dec.outName, false, ext, 'Name your restored image:');
 });
 
 $('dec-tab').addEventListener('click',()=>{
