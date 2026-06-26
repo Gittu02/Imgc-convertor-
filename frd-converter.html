@@ -1,0 +1,2090 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>FRD Converter</title>
+<style>
+/* ================================================================
+   TOKENS — Cyberpunk palette
+   Void black + toxic cyan + hot magenta + phosphor yellow
+================================================================ */
+:root {
+  --void:     #04050a;
+  --panel:    #080c14;
+  --surface:  #0d1220;
+  --border:   #1a2235;
+  --cyan:     #00f5ff;
+  --magenta:  #ff2d78;
+  --yellow:   #f5e642;
+  --green:    #39ff82;
+  --red:      #ff3b3b;
+  --text:     #c8d8f0;
+  --muted:    #3d5070;
+  --mono:     'Courier New', Courier, monospace;
+  --sans:     'Segoe UI', system-ui, sans-serif;
+  --r:        4px;
+  --r-lg:     10px;
+  --glow-c:   0 0 12px rgba(0,245,255,0.45);
+  --glow-m:   0 0 12px rgba(255,45,120,0.45);
+}
+
+/* ================================================================
+   RESET
+================================================================ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{
+  background:var(--void);
+  color:var(--text);
+  font-family:var(--sans);
+  min-height:100vh;
+  overflow-x:hidden;
+  font-size:14px;
+}
+
+/* ================================================================
+   SCANLINES — the signature cyberpunk texture
+================================================================ */
+body::after{
+  content:'';
+  position:fixed;
+  inset:0;
+  background:repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.18) 2px,
+    rgba(0,0,0,0.18) 4px
+  );
+  pointer-events:none;
+  z-index:9998;
+}
+
+/* ================================================================
+   GRID BACKGROUND
+================================================================ */
+body::before{
+  content:'';
+  position:fixed;
+  inset:0;
+  background-image:
+    linear-gradient(rgba(0,245,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,245,255,0.03) 1px, transparent 1px);
+  background-size:40px 40px;
+  pointer-events:none;
+  z-index:0;
+}
+
+.page{position:relative;z-index:1;}
+
+/* ================================================================
+   TYPOGRAPHY
+================================================================ */
+.mono{font-family:var(--mono);}
+
+/* ================================================================
+   HEADER
+================================================================ */
+header{
+  padding:48px 20px 32px;
+  text-align:center;
+  position:relative;
+}
+
+.hdr-line{
+  position:absolute;
+  bottom:0;left:0;right:0;
+  height:1px;
+  background:linear-gradient(90deg, transparent, var(--cyan), transparent);
+}
+
+.logo-row{
+  display:inline-flex;
+  align-items:center;
+  gap:14px;
+  margin-bottom:22px;
+}
+
+.logo-box{
+  width:52px;height:52px;
+  border:2px solid var(--cyan);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);
+  font-size:13px;
+  font-weight:700;
+  color:var(--cyan);
+  letter-spacing:1px;
+  box-shadow:var(--glow-c), inset 0 0 18px rgba(0,245,255,0.08);
+  position:relative;
+  animation:boxPulse 3s ease-in-out infinite;
+}
+
+@keyframes boxPulse{
+  0%,100%{box-shadow:var(--glow-c), inset 0 0 18px rgba(0,245,255,0.08);}
+  50%{box-shadow:0 0 24px rgba(0,245,255,0.7), inset 0 0 28px rgba(0,245,255,0.15);}
+}
+
+/* corner accents */
+.logo-box::before,.logo-box::after{
+  content:'';position:absolute;width:8px;height:8px;
+  border-color:var(--magenta);border-style:solid;
+}
+.logo-box::before{top:-2px;left:-2px;border-width:2px 0 0 2px;}
+.logo-box::after{bottom:-2px;right:-2px;border-width:0 2px 2px 0;}
+
+.logo-title{
+  font-family:var(--mono);
+  font-size:26px;
+  font-weight:700;
+  letter-spacing:4px;
+  color:var(--cyan);
+  text-shadow:0 0 20px rgba(0,245,255,0.6);
+}
+
+header h1{
+  font-family:var(--mono);
+  font-size:clamp(28px,6vw,56px);
+  font-weight:700;
+  letter-spacing:-1px;
+  line-height:1.05;
+  margin-bottom:12px;
+  color:#fff;
+}
+
+header h1 .glitch{
+  position:relative;
+  color:var(--cyan);
+  text-shadow:0 0 20px rgba(0,245,255,0.5);
+}
+
+/* glitch effect on title word */
+header h1 .glitch::before,
+header h1 .glitch::after{
+  content:attr(data-text);
+  position:absolute;
+  top:0;left:0;
+  width:100%;
+  overflow:hidden;
+}
+header h1 .glitch::before{
+  color:var(--magenta);
+  animation:glitch1 4s infinite;
+  clip-path:polygon(0 30%, 100% 30%, 100% 50%, 0 50%);
+}
+header h1 .glitch::after{
+  color:var(--cyan);
+  animation:glitch2 4s infinite;
+  clip-path:polygon(0 60%, 100% 60%, 100% 75%, 0 75%);
+}
+
+@keyframes glitch1{
+  0%,92%,100%{transform:translate(0);}
+  93%{transform:translate(-3px,1px);}
+  95%{transform:translate(3px,-1px);}
+  97%{transform:translate(-2px,0);}
+}
+@keyframes glitch2{
+  0%,92%,100%{transform:translate(0);}
+  94%{transform:translate(3px,1px);}
+  96%{transform:translate(-3px,-1px);}
+}
+
+header p{
+  color:var(--muted);
+  font-size:13px;
+  letter-spacing:1px;
+  text-transform:uppercase;
+  max-width:500px;
+  margin:0 auto;
+}
+
+.tag{
+  display:inline-block;
+  font-family:var(--mono);
+  font-size:10px;
+  letter-spacing:1.5px;
+  padding:2px 8px;
+  border:1px solid var(--cyan);
+  color:var(--cyan);
+  background:rgba(0,245,255,0.06);
+  text-transform:uppercase;
+  margin-bottom:14px;
+}
+
+/* ================================================================
+   NAV TABS
+================================================================ */
+.tabs{
+  display:flex;
+  gap:0;
+  max-width:860px;
+  margin:28px auto 0;
+  border-bottom:1px solid var(--border);
+  padding:0 20px;
+}
+
+.tab{
+  font-family:var(--mono);
+  font-size:11px;
+  letter-spacing:2px;
+  text-transform:uppercase;
+  color:var(--muted);
+  padding:10px 20px;
+  cursor:pointer;
+  border-bottom:2px solid transparent;
+  transition:all 0.2s;
+  user-select:none;
+  position:relative;
+  top:1px;
+  background:none;
+  border-top:none;
+  border-left:none;
+  border-right:none;
+}
+
+.tab:hover{color:var(--text);}
+.tab.active{color:var(--cyan);border-bottom-color:var(--cyan);text-shadow:0 0 8px rgba(0,245,255,0.5);}
+
+/* ================================================================
+   PANELS
+================================================================ */
+.panel{display:none;max-width:860px;margin:0 auto;padding:28px 20px 60px;}
+.panel.active{display:block;animation:fadeIn 0.25s ease;}
+
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+
+/* ================================================================
+   CARD
+================================================================ */
+.card{
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:var(--r-lg);
+  padding:24px;
+  position:relative;
+  margin-bottom:18px;
+}
+
+.card-accent-t{
+  position:absolute;top:0;left:20px;right:20px;height:1px;
+  background:linear-gradient(90deg,transparent,var(--cyan),transparent);
+}
+.card-accent-t.magenta{
+  background:linear-gradient(90deg,transparent,var(--magenta),transparent);
+}
+
+.card-label{
+  font-family:var(--mono);
+  font-size:10px;
+  letter-spacing:2px;
+  color:var(--muted);
+  text-transform:uppercase;
+  margin-bottom:16px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+.card-label::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* ================================================================
+   DROPZONE
+================================================================ */
+.dropzone{
+  border:1px dashed var(--border);
+  border-radius:var(--r);
+  padding:40px 20px;
+  text-align:center;
+  cursor:pointer;
+  transition:border-color 0.2s, background 0.2s;
+  position:relative;
+  background:rgba(0,245,255,0.01);
+}
+
+.dropzone:hover,.dropzone.drag-over{
+  border-color:var(--cyan);
+  background:rgba(0,245,255,0.04);
+}
+
+.dropzone input[type="file"]{
+  position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;
+}
+
+.dz-icon{font-size:32px;margin-bottom:10px;}
+
+.dz-main{
+  font-family:var(--mono);
+  font-size:13px;
+  color:var(--text);
+  margin-bottom:4px;
+}
+
+.dz-hint{font-size:11px;color:var(--muted);letter-spacing:0.5px;}
+
+/* ================================================================
+   COMPRESSION SLIDER
+================================================================ */
+.slider-wrap{margin:18px 0 0;}
+.slider-label-row{
+  display:flex;justify-content:space-between;align-items:center;
+  margin-bottom:8px;
+  font-family:var(--mono);
+  font-size:11px;
+  color:var(--muted);
+}
+
+.slider-val{color:var(--cyan);font-weight:700;}
+
+input[type="range"]{
+  -webkit-appearance:none;
+  width:100%;
+  height:4px;
+  background:var(--border);
+  border-radius:2px;
+  outline:none;
+  cursor:pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb{
+  -webkit-appearance:none;
+  width:16px;height:16px;
+  border-radius:50%;
+  background:var(--cyan);
+  box-shadow:0 0 8px rgba(0,245,255,0.6);
+  cursor:pointer;
+  transition:box-shadow 0.2s;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover{
+  box-shadow:0 0 16px rgba(0,245,255,0.9);
+}
+
+.slider-ticks{
+  display:flex;justify-content:space-between;
+  font-family:var(--mono);
+  font-size:9px;
+  color:var(--muted);
+  margin-top:4px;
+  padding:0 2px;
+}
+
+/* ================================================================
+   BATCH TABLE
+================================================================ */
+.batch-list{
+  margin-top:14px;
+  display:none;
+}
+.batch-list.visible{display:block;}
+
+.batch-item{
+  display:grid;
+  grid-template-columns:1fr auto auto;
+  align-items:center;
+  gap:10px;
+  padding:9px 12px;
+  border-bottom:1px solid var(--border);
+  font-family:var(--mono);
+  font-size:11px;
+}
+
+.batch-item:last-child{border-bottom:none;}
+
+.batch-fname{
+  color:var(--text);
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.batch-size{color:var(--muted);}
+
+.batch-status{
+  font-size:10px;
+  padding:2px 8px;
+  border-radius:2px;
+  font-weight:700;
+  letter-spacing:1px;
+}
+
+.batch-status.waiting {background:rgba(61,80,112,0.3);color:var(--muted);}
+.batch-status.converting{background:rgba(0,245,255,0.1);color:var(--cyan);}
+.batch-status.done {background:rgba(57,255,130,0.1);color:var(--green);}
+.batch-status.error {background:rgba(255,59,59,0.1);color:var(--red);}
+
+.batch-header{
+  display:grid;
+  grid-template-columns:1fr auto auto;
+  gap:10px;
+  padding:6px 12px;
+  font-family:var(--mono);
+  font-size:9px;
+  letter-spacing:1.5px;
+  color:var(--muted);
+  text-transform:uppercase;
+  border-bottom:1px solid var(--border);
+  background:rgba(255,255,255,0.02);
+}
+
+/* ================================================================
+   PREVIEW SECTION
+================================================================ */
+.preview-wrap{display:none;margin-top:16px;animation:fadeIn 0.3s ease;}
+.preview-wrap.visible{display:block;}
+
+.preview-img{
+  width:100%;
+  max-height:220px;
+  object-fit:contain;
+  border-radius:var(--r);
+  background:rgba(255,255,255,0.02);
+  border:1px solid var(--border);
+  display:block;
+}
+
+/* ================================================================
+   META GRID
+================================================================ */
+.meta-grid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:8px;
+  margin-top:12px;
+}
+
+@media(max-width:600px){.meta-grid{grid-template-columns:1fr 1fr;}}
+
+.meta-item{
+  background:rgba(255,255,255,0.02);
+  border:1px solid var(--border);
+  border-radius:var(--r);
+  padding:10px 12px;
+}
+
+.meta-label{
+  font-family:var(--mono);
+  font-size:9px;
+  letter-spacing:1.5px;
+  text-transform:uppercase;
+  color:var(--muted);
+  margin-bottom:4px;
+}
+
+.meta-value{
+  font-family:var(--mono);
+  font-size:12px;
+  font-weight:700;
+  color:var(--text);
+  word-break:break-all;
+}
+
+/* ================================================================
+   RAW PREVIEW
+================================================================ */
+.raw-wrap{
+  display:none;
+  margin-top:14px;
+  animation:fadeIn 0.3s ease;
+}
+.raw-wrap.visible{display:block;}
+
+.raw-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:8px;
+}
+
+.raw-title{
+  font-family:var(--mono);
+  font-size:10px;
+  letter-spacing:2px;
+  color:var(--cyan);
+  text-transform:uppercase;
+}
+
+.raw-box{
+  background:var(--void);
+  border:1px solid var(--border);
+  border-left:2px solid var(--cyan);
+  border-radius:var(--r);
+  padding:14px 16px;
+  font-family:var(--mono);
+  font-size:11px;
+  color:var(--muted);
+  line-height:1.8;
+  max-height:180px;
+  overflow-y:auto;
+  word-break:break-all;
+  white-space:pre-wrap;
+}
+
+.raw-box::-webkit-scrollbar{width:4px;}
+.raw-box::-webkit-scrollbar-track{background:var(--void);}
+.raw-box::-webkit-scrollbar-thumb{background:var(--border);}
+
+.raw-hl-key{color:var(--cyan);}
+.raw-hl-val{color:var(--yellow);}
+.raw-hl-marker{color:var(--magenta);}
+.raw-hl-data{color:#3d5070;}
+
+/* ================================================================
+   PROGRESS
+================================================================ */
+.progress-wrap{display:none;margin-top:14px;}
+.progress-wrap.visible{display:block;}
+
+.progress-row{
+  display:flex;justify-content:space-between;
+  font-family:var(--mono);font-size:10px;color:var(--muted);
+  margin-bottom:6px;
+}
+
+.progress-track{
+  height:3px;
+  background:var(--border);
+  border-radius:2px;
+  overflow:hidden;
+}
+
+.progress-bar{
+  height:100%;
+  width:0%;
+  background:linear-gradient(90deg,var(--cyan),var(--magenta));
+  transition:width 0.35s ease;
+  box-shadow:0 0 8px rgba(0,245,255,0.4);
+}
+
+/* ================================================================
+   BUTTONS
+================================================================ */
+.btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  padding:10px 18px;
+  border-radius:var(--r);
+  font-family:var(--mono);
+  font-size:11px;
+  letter-spacing:1.5px;
+  text-transform:uppercase;
+  font-weight:700;
+  cursor:pointer;
+  transition:all 0.18s;
+  border:none;
+  white-space:nowrap;
+}
+.btn:disabled{opacity:0.3;cursor:not-allowed;pointer-events:none;}
+
+.btn-cyan{
+  background:transparent;
+  border:1px solid var(--cyan);
+  color:var(--cyan);
+  box-shadow:inset 0 0 0 0 rgba(0,245,255,0);
+}
+.btn-cyan:hover{
+  background:rgba(0,245,255,0.08);
+  box-shadow:var(--glow-c);
+}
+
+.btn-magenta{
+  background:transparent;
+  border:1px solid var(--magenta);
+  color:var(--magenta);
+}
+.btn-magenta:hover{
+  background:rgba(255,45,120,0.08);
+  box-shadow:var(--glow-m);
+}
+
+.btn-solid{
+  background:var(--cyan);
+  color:var(--void);
+  border:1px solid var(--cyan);
+}
+.btn-solid:hover{
+  background:#33f8ff;
+  box-shadow:var(--glow-c);
+}
+
+.btn-ghost{
+  background:transparent;
+  border:1px solid var(--border);
+  color:var(--muted);
+}
+.btn-ghost:hover{border-color:var(--text);color:var(--text);}
+
+.btn-green{
+  background:transparent;
+  border:1px solid var(--green);
+  color:var(--green);
+}
+.btn-green:hover{background:rgba(57,255,130,0.08);box-shadow:0 0 12px rgba(57,255,130,0.3);}
+
+.btn-group{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;}
+
+/* ================================================================
+   RESULT / ERROR BOX
+================================================================ */
+.result-box{
+  display:none;
+  margin-top:14px;
+  padding:14px 16px;
+  border-radius:var(--r);
+  animation:fadeIn 0.3s ease;
+}
+.result-box.visible{display:block;}
+
+.result-ok{
+  border:1px solid rgba(57,255,130,0.3);
+  background:rgba(57,255,130,0.04);
+}
+
+.result-err{
+  border:1px solid rgba(255,59,59,0.3);
+  background:rgba(255,59,59,0.04);
+}
+
+.result-title{
+  font-family:var(--mono);
+  font-size:11px;
+  letter-spacing:1.5px;
+  text-transform:uppercase;
+  margin-bottom:6px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+.result-detail{
+  font-family:var(--mono);
+  font-size:11px;
+  color:var(--muted);
+  line-height:1.9;
+  white-space:pre-wrap;
+}
+
+/* ================================================================
+   SPINNER
+================================================================ */
+.spinner{
+  display:none;
+  width:14px;height:14px;
+  border:2px solid rgba(0,245,255,0.2);
+  border-top-color:var(--cyan);
+  border-radius:50%;
+  animation:spin 0.7s linear infinite;
+  flex-shrink:0;
+}
+.spinner.visible{display:inline-block;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* ================================================================
+   ABOUT PANEL
+================================================================ */
+.spec-table{width:100%;border-collapse:collapse;margin-top:12px;}
+.spec-table td,.spec-table th{
+  padding:9px 14px;
+  border-bottom:1px solid var(--border);
+  font-family:var(--mono);
+  font-size:11px;
+  text-align:left;
+}
+.spec-table th{
+  color:var(--muted);
+  letter-spacing:1.5px;
+  text-transform:uppercase;
+  font-size:9px;
+  background:rgba(255,255,255,0.02);
+}
+.spec-table td:first-child{color:var(--cyan);}
+
+.format-block{
+  background:var(--void);
+  border:1px solid var(--border);
+  border-left:2px solid var(--magenta);
+  border-radius:var(--r);
+  padding:18px 20px;
+  font-family:var(--mono);
+  font-size:12px;
+  line-height:2;
+  margin-top:14px;
+}
+
+.fl-key{color:var(--cyan);}
+.fl-val{color:var(--yellow);}
+.fl-marker{color:var(--magenta);font-weight:700;}
+.fl-data{color:var(--muted);}
+
+/* ================================================================
+   TOAST
+================================================================ */
+#toasts{
+  position:fixed;bottom:20px;right:20px;
+  z-index:9999;
+  display:flex;flex-direction:column;gap:8px;
+  pointer-events:none;
+}
+
+.toast{
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:var(--r);
+  padding:10px 16px;
+  font-family:var(--mono);
+  font-size:11px;
+  letter-spacing:0.5px;
+  display:flex;align-items:center;gap:10px;
+  box-shadow:0 6px 24px rgba(0,0,0,0.5);
+  animation:slideUp 0.3s ease, fadeOut 0.4s ease 2.6s forwards;
+  pointer-events:auto;
+  max-width:280px;
+}
+.toast.ok {border-left:2px solid var(--green);}
+.toast.err{border-left:2px solid var(--red);}
+.toast.inf{border-left:2px solid var(--cyan);}
+
+@keyframes slideUp{
+  from{opacity:0;transform:translateY(12px);}
+  to  {opacity:1;transform:translateY(0);}
+}
+@keyframes fadeOut{
+  from{opacity:1;}
+  to  {opacity:0;pointer-events:none;}
+}
+
+/* ================================================================
+   FOOTER
+================================================================ */
+footer{
+  text-align:center;
+  padding:20px;
+  font-family:var(--mono);
+  font-size:10px;
+  letter-spacing:1px;
+  color:var(--muted);
+  border-top:1px solid var(--border);
+  position:relative;z-index:1;
+}
+
+footer span{color:var(--cyan);}
+
+/* ================================================================
+   KEY INPUT
+================================================================ */
+.key-wrap{
+  margin-top:18px;
+  border:1px solid var(--border);
+  border-radius:var(--r);
+  padding:16px;
+  background:rgba(245,230,66,0.02);
+  position:relative;
+}
+
+.key-wrap::before{
+  content:'';
+  position:absolute;
+  top:0;left:20px;right:20px;height:1px;
+  background:linear-gradient(90deg,transparent,var(--yellow),transparent);
+}
+
+.key-label-row{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-bottom:10px;
+  font-family:var(--mono);
+  font-size:10px;
+  letter-spacing:2px;
+  color:var(--yellow);
+  text-transform:uppercase;
+}
+
+.key-lock-icon{font-size:13px;}
+
+.key-input-row{
+  display:flex;
+  align-items:center;
+  gap:0;
+  border:1px solid var(--border);
+  border-radius:var(--r);
+  overflow:hidden;
+  background:var(--void);
+  transition:border-color 0.2s;
+}
+
+.key-input-row:focus-within{
+  border-color:var(--yellow);
+  box-shadow:0 0 0 1px rgba(245,230,66,0.2);
+}
+
+.key-prefix{
+  font-family:var(--mono);
+  font-size:13px;
+  color:var(--yellow);
+  padding:0 12px;
+  opacity:0.6;
+  flex-shrink:0;
+  user-select:none;
+}
+
+.key-field{
+  flex:1;
+  background:transparent;
+  border:none;
+  outline:none;
+  color:var(--yellow);
+  font-family:var(--mono);
+  font-size:13px;
+  padding:10px 12px 10px 0;
+  letter-spacing:1px;
+}
+
+.key-field::placeholder{color:var(--muted);letter-spacing:0.5px;}
+
+.key-toggle{
+  background:none;
+  border:none;
+  border-left:1px solid var(--border);
+  cursor:pointer;
+  padding:0 12px;
+  color:var(--muted);
+  font-size:13px;
+  height:100%;
+  transition:color 0.2s;
+  align-self:stretch;
+  display:flex;align-items:center;
+}
+
+.key-toggle:hover{color:var(--yellow);}
+
+.key-hint{
+  font-family:var(--mono);
+  font-size:10px;
+  color:var(--muted);
+  margin-top:8px;
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+
+.key-badge{
+  display:inline-block;
+  font-family:var(--mono);
+  font-size:9px;
+  padding:1px 6px;
+  border-radius:2px;
+  background:rgba(245,230,66,0.1);
+  color:var(--yellow);
+  border:1px solid rgba(245,230,66,0.25);
+  letter-spacing:1px;
+}
+
+/* ================================================================
+   UTILS
+================================================================ */
+.hidden{display:none!important;}
+.sep{height:1px;background:var(--border);margin:18px 0;}
+
+@media(max-width:500px){
+  .tab{padding:8px 12px;font-size:10px;letter-spacing:1px;}
+  .btn{padding:9px 14px;font-size:10px;}
+}
+
+#fn-input-wrap:focus-within{
+  border-color:var(--cyan);
+  box-shadow:0 0 0 1px var(--cyan), inset 0 0 12px rgba(0,245,255,0.04);
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- ══════════════════ HEADER ══════════════════ -->
+<header>
+  <div class="logo-row">
+    <div class="logo-box">FRD</div>
+    <div class="logo-title">CONVERTER</div>
+  </div>
+  <div class="tag">Custom File Format Utility</div>
+  <h1><span class="glitch" data-text="FRD">FRD</span> Converter</h1>
+  <p>Pack images into .frd containers — extract them back. All in-browser.</p>
+  <div class="hdr-line"></div>
+</header>
+
+<!-- ══════════════════ TABS ══════════════════ -->
+<div class="tabs">
+  <button class="tab active" data-tab="encode">▶ Encode</button>
+  <button class="tab" data-tab="batch">⚡ Batch</button>
+  <button class="tab" data-tab="decode">◀ Decode</button>
+  <button class="tab" data-tab="about">◈ About</button>
+</div>
+
+<!-- ══════════════════════════════════════════
+     PANEL: ENCODE (single)
+══════════════════════════════════════════ -->
+<div class="panel active" id="panel-encode">
+
+  <!-- Drop -->
+  <div class="card">
+    <div class="card-accent-t"></div>
+    <div class="card-label">Source Image</div>
+    <div class="dropzone" id="enc-drop">
+      <input type="file" id="enc-input" accept=".png,.jpg,.jpeg,.webp"/>
+      <div class="dz-icon">▦</div>
+      <div class="dz-main">DROP IMAGE HERE</div>
+      <div class="dz-hint">PNG · JPG · JPEG · WEBP — or click to select</div>
+    </div>
+
+    <!-- Compression -->
+    <div class="slider-wrap">
+      <div class="slider-label-row">
+        <span>Quality</span>
+        <span class="slider-val" id="enc-quality-val">92%</span>
+      </div>
+      <input type="range" id="enc-quality" min="10" max="100" value="92"/>
+      <div class="slider-ticks">
+        <span>Lo-fi</span><span>Balanced</span><span>Lossless</span>
+      </div>
+    </div>
+
+    <!-- Encryption Key -->
+    <div class="key-wrap">
+      <div class="key-label-row">
+        <span class="key-lock-icon">🔑</span>
+        <span>Encryption Key</span>
+        <span class="key-badge">OPTIONAL</span>
+      </div>
+      <div class="key-input-row">
+        <span class="key-prefix">KEY://</span>
+        <input class="key-field" id="enc-key" type="password" placeholder="Leave blank for no encryption" autocomplete="off" spellcheck="false"/>
+        <button class="key-toggle" id="enc-key-toggle" title="Show/Hide">👁</button>
+      </div>
+      <div class="key-hint">
+        ◈ Wrong key on decode → corrupted image is shown, not an error
+      </div>
+    </div>
+  </div>
+
+  <!-- Preview -->
+  <div class="preview-wrap" id="enc-preview-wrap">
+    <div class="card">
+      <div class="card-accent-t"></div>
+      <div class="card-label">Preview</div>
+      <img class="preview-img" id="enc-img" alt="preview"/>
+      <div class="meta-grid" id="enc-meta"></div>
+    </div>
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-wrap" id="enc-prog-wrap">
+    <div class="progress-row">
+      <span id="enc-prog-label">Processing…</span>
+      <span id="enc-prog-pct">0%</span>
+    </div>
+    <div class="progress-track"><div class="progress-bar" id="enc-prog-bar"></div></div>
+  </div>
+
+  <!-- Actions -->
+  <div id="enc-actions" class="hidden">
+    <div class="btn-group">
+      <button class="btn btn-solid" id="enc-btn">
+        <div class="spinner" id="enc-spinner"></div>
+        <span id="enc-btn-lbl">ENCODE → .FRD</span>
+      </button>
+      <button class="btn btn-ghost" id="enc-reset">RESET</button>
+    </div>
+  </div>
+
+  <!-- Result OK -->
+  <div class="result-box result-ok" id="enc-result">
+    <div class="result-title" style="color:var(--green)">▶ ENCODE COMPLETE</div>
+    <div class="result-detail" id="enc-result-detail"></div>
+    <div class="btn-group">
+      <button class="btn btn-green" id="enc-dl">⬇ DOWNLOAD .FRD</button>
+    </div>
+  </div>
+
+  <!-- Raw preview -->
+  <div class="raw-wrap" id="enc-raw-wrap">
+    <div class="raw-header">
+      <div class="raw-title">▸ Raw .FRD Content</div>
+      <button class="btn btn-ghost" id="enc-raw-toggle" style="padding:4px 10px;font-size:9px;">COLLAPSE</button>
+    </div>
+    <div class="raw-box" id="enc-raw-box"></div>
+  </div>
+
+  <!-- Result ERR -->
+  <div class="result-box result-err" id="enc-error">
+    <div class="result-title" style="color:var(--red)">✕ ERROR</div>
+    <div class="result-detail" id="enc-error-msg"></div>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════════════
+     PANEL: BATCH
+══════════════════════════════════════════ -->
+<div class="panel" id="panel-batch">
+
+  <div class="card">
+    <div class="card-accent-t magenta"></div>
+    <div class="card-label">Batch Source</div>
+    <div class="dropzone" id="batch-drop">
+      <input type="file" id="batch-input" accept=".png,.jpg,.jpeg,.webp" multiple/>
+      <div class="dz-icon">⚡</div>
+      <div class="dz-main">DROP MULTIPLE IMAGES</div>
+      <div class="dz-hint">Select several PNG / JPG / WEBP at once</div>
+    </div>
+
+    <div class="slider-wrap">
+      <div class="slider-label-row">
+        <span>Quality</span>
+        <span class="slider-val" id="batch-quality-val">92%</span>
+      </div>
+      <input type="range" id="batch-quality" min="10" max="100" value="92"/>
+      <div class="slider-ticks">
+        <span>Lo-fi</span><span>Balanced</span><span>Lossless</span>
+      </div>
+    </div>
+
+    <!-- Encryption Key -->
+    <div class="key-wrap">
+      <div class="key-label-row">
+        <span class="key-lock-icon">🔑</span>
+        <span>Encryption Key</span>
+        <span class="key-badge">OPTIONAL</span>
+      </div>
+      <div class="key-input-row">
+        <span class="key-prefix">KEY://</span>
+        <input class="key-field" id="batch-key" type="password" placeholder="Applied to all files in batch" autocomplete="off" spellcheck="false"/>
+        <button class="key-toggle" id="batch-key-toggle" title="Show/Hide">👁</button>
+      </div>
+      <div class="key-hint">
+        ◈ Wrong key on decode → corrupted image is shown, not an error
+      </div>
+    </div>
+  </div>
+
+  <!-- File list -->
+  <div class="batch-list" id="batch-list">
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div class="card-accent-t magenta"></div>
+      <div class="batch-header">
+        <span>Filename</span>
+        <span>Size</span>
+        <span>Status</span>
+      </div>
+      <div id="batch-rows"></div>
+    </div>
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-wrap" id="batch-prog-wrap">
+    <div class="progress-row">
+      <span id="batch-prog-label">Converting…</span>
+      <span id="batch-prog-pct">0%</span>
+    </div>
+    <div class="progress-track"><div class="progress-bar" id="batch-prog-bar" style="background:linear-gradient(90deg,var(--magenta),var(--cyan));"></div></div>
+  </div>
+
+  <div id="batch-actions" class="hidden">
+    <div class="btn-group">
+      <button class="btn btn-magenta" id="batch-btn">
+        <div class="spinner" id="batch-spinner" style="border-top-color:var(--magenta)"></div>
+        <span id="batch-btn-lbl">⚡ CONVERT ALL</span>
+      </button>
+      <button class="btn btn-ghost" id="batch-reset">CLEAR</button>
+    </div>
+  </div>
+
+  <div class="result-box result-ok" id="batch-result">
+    <div class="result-title" style="color:var(--green)">▶ BATCH COMPLETE</div>
+    <div class="result-detail" id="batch-result-detail"></div>
+    <div class="btn-group" id="batch-dl-group"></div>
+  </div>
+
+  <div class="result-box result-err" id="batch-error">
+    <div class="result-title" style="color:var(--red)">✕ ERROR</div>
+    <div class="result-detail" id="batch-error-msg"></div>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════════════
+     PANEL: DECODE
+══════════════════════════════════════════ -->
+<div class="panel" id="panel-decode">
+
+  <div class="card">
+    <div class="card-accent-t" style="background:linear-gradient(90deg,transparent,var(--magenta),transparent)"></div>
+    <div class="card-label">Source .FRD File</div>
+    <div class="dropzone" id="dec-drop">
+      <input type="file" id="dec-input" accept=".frd"/>
+      <div class="dz-icon">◈</div>
+      <div class="dz-main">DROP .FRD FILE HERE</div>
+      <div class="dz-hint">Only .frd files accepted — or click to browse</div>
+    </div>
+
+    <!-- Decryption Key -->
+    <div class="key-wrap" style="border-color:rgba(255,45,120,0.2);background:rgba(255,45,120,0.02);">
+      <div style="position:absolute;top:0;left:20px;right:20px;height:1px;background:linear-gradient(90deg,transparent,var(--magenta),transparent);"></div>
+      <div class="key-label-row" style="color:var(--magenta);">
+        <span class="key-lock-icon">🔐</span>
+        <span>Decryption Key</span>
+        <span class="key-badge" style="background:rgba(255,45,120,0.1);color:var(--magenta);border-color:rgba(255,45,120,0.25);">IF ENCRYPTED</span>
+      </div>
+      <div class="key-input-row" style="">
+        <span class="key-prefix" style="color:var(--magenta);">KEY://</span>
+        <input class="key-field" id="dec-key" type="password" placeholder="Enter key used during encode" autocomplete="off" spellcheck="false" style="color:var(--magenta);"/>
+        <button class="key-toggle" id="dec-key-toggle" title="Show/Hide" style="">👁</button>
+      </div>
+      <div class="key-hint">
+        ◈ Wrong key → image decodes as corrupted noise, not an error
+      </div>
+    </div>
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-wrap" id="dec-prog-wrap">
+    <div class="progress-row">
+      <span id="dec-prog-label">Decoding…</span>
+      <span id="dec-prog-pct">0%</span>
+    </div>
+    <div class="progress-track"><div class="progress-bar" id="dec-prog-bar" style="background:linear-gradient(90deg,var(--magenta),var(--cyan))"></div></div>
+  </div>
+
+  <div id="dec-actions" class="hidden">
+    <div class="btn-group">
+      <button class="btn btn-cyan" id="dec-btn" style="border-color:var(--magenta);color:var(--magenta);">
+        <div class="spinner" id="dec-spinner" style="border-top-color:var(--magenta)"></div>
+        <span id="dec-btn-lbl">DECODE .FRD</span>
+      </button>
+      <button class="btn btn-ghost" id="dec-reset">RESET</button>
+    </div>
+  </div>
+
+  <!-- Preview -->
+  <div class="preview-wrap" id="dec-preview-wrap">
+    <div class="card">
+      <div class="card-accent-t" style="background:linear-gradient(90deg,transparent,var(--magenta),transparent)"></div>
+      <div class="card-label">Restored Image</div>
+      <img class="preview-img" id="dec-img" alt="restored"/>
+      <div class="meta-grid" id="dec-meta"></div>
+    </div>
+  </div>
+
+  <!-- Raw -->
+  <div class="raw-wrap" id="dec-raw-wrap">
+    <div class="raw-header">
+      <div class="raw-title">▸ Raw .FRD Content</div>
+      <button class="btn btn-ghost" id="dec-raw-toggle" style="padding:4px 10px;font-size:9px;">COLLAPSE</button>
+    </div>
+    <div class="raw-box" id="dec-raw-box"></div>
+  </div>
+
+  <!-- Result -->
+  <div class="result-box result-ok" id="dec-result">
+    <div class="result-title" style="color:var(--green)">▶ DECODE COMPLETE</div>
+    <div class="result-detail" id="dec-result-detail"></div>
+    <div class="btn-group">
+      <button class="btn btn-green" id="dec-dl">⬇ DOWNLOAD IMAGE</button>
+      <button class="btn btn-ghost" id="dec-tab">↗ OPEN IN TAB</button>
+    </div>
+  </div>
+
+  <div class="result-box result-err" id="dec-error">
+    <div class="result-title" style="color:var(--red)">✕ ERROR</div>
+    <div class="result-detail" id="dec-error-msg"></div>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════════════
+     PANEL: ABOUT
+══════════════════════════════════════════ -->
+<div class="panel" id="panel-about">
+  <div class="card">
+    <div class="card-accent-t"></div>
+    <div class="card-label">Format Specification</div>
+
+    <table class="spec-table">
+      <tr><th>Field</th><th>Description</th></tr>
+      <tr><td>FRD-V1</td><td>Magic header — identifies a valid FRD file</td></tr>
+      <tr><td>filename</td><td>Original image filename with extension</td></tr>
+      <tr><td>created</td><td>Unix timestamp (ms) of conversion</td></tr>
+      <tr><td>type</td><td>MIME type of the original image</td></tr>
+      <tr><td>width / height</td><td>Pixel dimensions of the original</td></tr>
+      <tr><td>quality</td><td>Compression quality used (10–100)</td></tr>
+      <tr><td>encrypted</td><td>true if data is XOR-encrypted with a key, false otherwise</td></tr>
+      <tr><td>DATA_START</td><td>Marks the beginning of Base64 image data</td></tr>
+      <tr><td>DATA_END</td><td>Marks the end of image data</td></tr>
+    </table>
+
+    <div class="format-block">
+<span class="fl-marker">FRD-V1</span>
+<span class="fl-key">filename</span>=<span class="fl-val">photo.png</span>
+<span class="fl-key">created</span>=<span class="fl-val">1719196800000</span>
+<span class="fl-key">type</span>=<span class="fl-val">image/png</span>
+<span class="fl-key">width</span>=<span class="fl-val">1920</span>
+<span class="fl-key">height</span>=<span class="fl-val">1080</span>
+<span class="fl-key">quality</span>=<span class="fl-val">92</span>
+
+<span class="fl-marker">DATA_START</span>
+<span class="fl-data">iVBORw0KGgoAAAANSUhEUgAAB4AAAAO…</span>
+<span class="fl-marker">DATA_END</span></div>
+  </div>
+
+  <div class="card">
+    <div class="card-accent-t magenta"></div>
+    <div class="card-label">How it works</div>
+    <table class="spec-table">
+      <tr><th>Step</th><th>What happens</th></tr>
+      <tr><td>FileReader</td><td>Reads image into browser memory as ArrayBuffer</td></tr>
+      <tr><td>Canvas API</td><td>Re-renders image at chosen quality level</td></tr>
+      <tr><td>Base64</td><td>Canvas output encoded as a text-safe string</td></tr>
+      <tr><td>Blob + URL</td><td>FRD text assembled and downloaded without a server</td></tr>
+      <tr><td>Decode</td><td>Header parsed, Base64 injected back as data: URI</td></tr>
+    </table>
+  </div>
+</div>
+
+</div><!-- /page -->
+
+<!-- ══════════════════════════════════════════
+     FILENAME MODAL
+══════════════════════════════════════════ -->
+<div id="fn-overlay" style="
+  display:none;
+  position:fixed;inset:0;
+  background:rgba(4,5,10,0.85);
+  backdrop-filter:blur(4px);
+  z-index:10000;
+  align-items:center;
+  justify-content:center;
+">
+  <div id="fn-modal" style="
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:var(--r-lg);
+    padding:28px 28px 24px;
+    width:min(420px,90vw);
+    position:relative;
+    animation:fadeIn 0.2s ease;
+  ">
+    <!-- top accent line -->
+    <div style="position:absolute;top:0;left:20px;right:20px;height:1px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);"></div>
+    <!-- corner accents -->
+    <div style="position:absolute;top:-1px;left:-1px;width:12px;height:12px;border-top:2px solid var(--magenta);border-left:2px solid var(--magenta);border-radius:var(--r-lg) 0 0 0;"></div>
+    <div style="position:absolute;bottom:-1px;right:-1px;width:12px;height:12px;border-bottom:2px solid var(--magenta);border-right:2px solid var(--magenta);border-radius:0 0 var(--r-lg) 0;"></div>
+
+    <div style="font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:16px;">▸ Name Your File</div>
+
+    <div style="font-size:13px;color:var(--text);margin-bottom:14px;" id="fn-modal-desc">Enter filename:</div>
+
+    <!-- Input row -->
+    <div style="display:flex;align-items:center;gap:0;border:1px solid var(--border);border-radius:var(--r);overflow:hidden;background:var(--void);transition:border-color 0.2s;" id="fn-input-wrap">
+      <input
+        id="fn-input"
+        type="text"
+        autocomplete="off"
+        spellcheck="false"
+        style="
+          flex:1;
+          background:transparent;
+          border:none;
+          outline:none;
+          color:var(--cyan);
+          font-family:var(--mono);
+          font-size:14px;
+          padding:11px 14px;
+          letter-spacing:0.5px;
+        "
+      />
+      <span id="fn-ext-badge" style="
+        font-family:var(--mono);
+        font-size:13px;
+        font-weight:700;
+        color:var(--magenta);
+        padding:0 14px 0 0;
+        white-space:nowrap;
+        user-select:none;
+      ">.frd</span>
+    </div>
+
+    <!-- Hint -->
+    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:8px;" id="fn-hint">
+      Letters, numbers, hyphens and underscores only.
+    </div>
+
+    <!-- Buttons -->
+    <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end;">
+      <button class="btn btn-ghost" id="fn-cancel" style="padding:9px 18px;">CANCEL</button>
+      <button class="btn btn-solid" id="fn-confirm" style="padding:9px 18px;">⬇ DOWNLOAD</button>
+    </div>
+  </div>
+</div>
+
+<footer>
+  100% client-side — <span>zero server contact</span> — FileReader · Canvas · Blob · createObjectURL
+</footer>
+
+<div id="toasts"></div>
+
+<script>
+'use strict';
+/* ============================================================
+   FRD Converter — Main Script
+============================================================ */
+
+/* ─── DOM shorthand ─── */
+const $ = id => document.getElementById(id);
+const show  = el => { if(el) el.classList.add('visible'); };
+const hide  = el => { if(el) el.classList.remove('visible'); };
+const revEl = (el,v) => { if(el) el.classList.toggle('hidden', !v); };
+
+/* ================================================================
+   KEY SYSTEM — XOR cipher on base64 string
+================================================================ */
+
+/**
+ * Expand a short passphrase into a deterministic keystream
+ * using a simple seeded PRNG so the same key always produces
+ * the same byte sequence, regardless of data length.
+ */
+function keyStream(key, length){
+  // Seed from key characters
+  let seed = 0;
+  for(let i=0;i<key.length;i++) seed = (seed * 31 + key.charCodeAt(i)) >>> 0;
+
+  const stream = new Uint8Array(length);
+  let s = seed;
+  for(let i=0;i<length;i++){
+    // xorshift32
+    s ^= s << 13; s = s >>> 0;
+    s ^= s >> 17; s = s >>> 0;
+    s ^= s << 5;  s = s >>> 0;
+    stream[i] = s & 0xFF;
+  }
+  return stream;
+}
+
+/**
+ * XOR-cipher the base64 string with a key.
+ * Only operates on base64 charset chars to keep the result valid base64.
+ * Characters outside base64 alphabet (newlines, =) are passed through untouched.
+ */
+function xorBase64(base64str, key){
+  if(!key) return base64str;
+  const chars = base64str.split('');
+  // Build array of indices that are actual base64 data chars
+  const dataIndices = [];
+  const b64Chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+  for(let i=0;i<chars.length;i++){
+    if(b64Chars.includes(chars[i]) && chars[i]!=='\n' && chars[i]!=='\r') dataIndices.push(i);
+  }
+  const stream = keyStream(key, dataIndices.length);
+  // XOR each base64 data character's char-code then remap into base64 alphabet
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  for(let di=0;di<dataIndices.length;di++){
+    const idx = dataIndices[di];
+    if(chars[idx]==='=') continue; // leave padding untouched
+    const pos = alphabet.indexOf(chars[idx]);
+    if(pos===-1) continue;
+    // XOR position within alphabet, wrap to stay in valid base64 chars
+    chars[idx] = alphabet[(pos ^ stream[di]) % alphabet.length];
+  }
+  return chars.join('');
+}
+
+/* ─── Key toggle show/hide ─── */
+function setupKeyToggle(fieldId, toggleId){
+  const field=$(fieldId), btn=$(toggleId);
+  if(!field||!btn) return;
+  btn.addEventListener('click',()=>{
+    field.type = field.type==='password' ? 'text' : 'password';
+    btn.textContent = field.type==='password' ? '👁' : '🙈';
+  });
+}
+
+/* ─── State ─── */
+const S = {
+  enc: { file:null, dataURL:null, frdContent:null, outName:null, w:0, h:0 },
+  dec: { file:null, dataURL:null, outName:null, outMime:null },
+  batch: { files:[], frdContents:[], outNames:[] }
+};
+
+/* ─── Utilities ─── */
+function fmtSize(b){
+  if(b<1024) return b+' B';
+  if(b<1048576) return (b/1024).toFixed(1)+' KB';
+  return (b/1048576).toFixed(2)+' MB';
+}
+
+function fmtDate(ts){
+  return new Date(Number(ts)).toLocaleString();
+}
+
+function metaItem(label, value){
+  return `<div class="meta-item"><div class="meta-label">${label}</div><div class="meta-value">${value}</div></div>`;
+}
+
+/* ─── Toast ─── */
+function toast(msg, type='inf'){
+  const icons = {ok:'▶', err:'✕', inf:'◈'};
+  const tc = $('toasts');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span style="color:${type==='ok'?'var(--green)':type==='err'?'var(--red)':'var(--cyan)'}">${icons[type]}</span><span>${msg}</span>`;
+  tc.appendChild(el);
+  setTimeout(()=>el.remove(), 3100);
+}
+
+/* ─── Progress animator ─── */
+function animProg(barId, pctId, wrapId, labelId, from, to, ms, lbl){
+  return new Promise(res => {
+    const bar=$( barId), pct=$(pctId), wrap=$(wrapId), label=$(labelId);
+    if(label) label.textContent = lbl||'Processing…';
+    show(wrap);
+    const t0=performance.now();
+    function step(now){
+      const p=Math.min((now-t0)/ms,1);
+      const e=1-Math.pow(1-p,3);
+      const cur=from+(to-from)*e;
+      if(bar) bar.style.width=cur+'%';
+      if(pct) pct.textContent=Math.round(cur)+'%';
+      p<1?requestAnimationFrame(step):res();
+    }
+    requestAnimationFrame(step);
+  });
+}
+
+/* ─── File readers ─── */
+function readDataURL(file){
+  return new Promise((res,rej)=>{
+    const fr=new FileReader();
+    fr.onload=e=>res(e.target.result);
+    fr.onerror=()=>rej(new Error('FileReader failed'));
+    fr.readAsDataURL(file);
+  });
+}
+
+function readText(file){
+  return new Promise((res,rej)=>{
+    const fr=new FileReader();
+    fr.onload=e=>res(e.target.result);
+    fr.onerror=()=>rej(new Error('FileReader failed'));
+    fr.readAsText(file);
+  });
+}
+
+/* ─── Get image dimensions ─── */
+function getDims(src){
+  return new Promise((res,rej)=>{
+    const img=new Image();
+    img.onload=()=>res({w:img.naturalWidth,h:img.naturalHeight});
+    img.onerror=()=>rej(new Error('Cannot read image dimensions'));
+    img.src=src;
+  });
+}
+
+/* ─── Compress via Canvas ─── */
+function compressImage(dataURL, mime, quality){
+  return new Promise((res,rej)=>{
+    const img=new Image();
+    img.onload=()=>{
+      const cv=document.createElement('canvas');
+      cv.width=img.naturalWidth;
+      cv.height=img.naturalHeight;
+      const ctx=cv.getContext('2d');
+      ctx.drawImage(img,0,0);
+      // Canvas toDataURL quality only applies to jpeg/webp
+      const outMime = (mime==='image/png')?'image/png':
+                      (mime==='image/webp')?'image/webp':'image/jpeg';
+      const q = quality/100;
+      res(cv.toDataURL(outMime, q));
+    };
+    img.onerror=()=>rej(new Error('Canvas compression failed'));
+    img.src=dataURL;
+  });
+}
+
+/* ─── Build FRD string ─── */
+function buildFRD(filename, mime, w, h, quality, base64, ts, encrypted){
+  return [
+    'FRD-V1',
+    `filename=${filename}`,
+    `created=${ts}`,
+    `type=${mime}`,
+    `width=${w}`,
+    `height=${h}`,
+    `quality=${quality}`,
+    `encrypted=${encrypted?'true':'false'}`,
+    '',
+    'DATA_START',
+    base64,
+    'DATA_END'
+  ].join('\n');
+}
+
+/* ─── Syntax-highlight raw FRD ─── */
+function highlightFRD(txt){
+  const truncated = txt.length > 3000
+    ? txt.substring(0, 3000) + '\n… [truncated for display]'
+    : txt;
+
+  return truncated
+    .split('\n')
+    .map(line => {
+      if(line==='FRD-V1') return `<span class="raw-hl-marker">FRD-V1</span>`;
+      if(line==='DATA_START'||line==='DATA_END') return `<span class="raw-hl-marker">${line}</span>`;
+      if(line.includes('=')){
+        const idx=line.indexOf('=');
+        const k=line.substring(0,idx);
+        const v=line.substring(idx+1);
+        return `<span class="raw-hl-key">${k}</span>=<span class="raw-hl-val">${v}</span>`;
+      }
+      // base64 data line
+      if(line.length>40) return `<span class="raw-hl-data">${line}</span>`;
+      return line;
+    })
+    .join('\n');
+}
+
+/* ─── Core download (fires after name confirmed) ─── */
+function triggerDL(content, filename, isText=true){
+  let blob;
+  if(isText){
+    blob = new Blob([content], {type:'text/plain'});
+  } else {
+    // dataURL → binary blob
+    const parts = content.split(',');
+    const mime = parts[0].split(':')[1].split(';')[0];
+    const byteStr = atob(parts[1]);
+    const arr = new Uint8Array(byteStr.length);
+    for(let i=0;i<byteStr.length;i++) arr[i]=byteStr.charCodeAt(i);
+    blob = new Blob([arr],{type:mime});
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.style.display = 'none';
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  // Clean up after short delay to ensure browser registers the click
+  setTimeout(()=>{
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 1000);
+}
+
+/* ─── Filename modal ─── */
+// pending download state
+let _dlPending = null;
+
+function askAndDownload(content, defaultName, isText, ext, description){
+  // Strip extension from default name for the input field
+  const base = defaultName.replace(/\.[^.]+$/, '');
+  $('fn-input').value = base;
+  $('fn-ext-badge').textContent = ext;      // e.g. ".frd" or ".png"
+  $('fn-modal-desc').textContent = description || 'Enter a filename:';
+  $('fn-hint').textContent = 'Letters, numbers, hyphens and underscores only.';
+
+  _dlPending = { content, isText, ext };
+
+  const overlay = $('fn-overlay');
+  overlay.style.display = 'flex';
+  // focus & select all text in input
+  setTimeout(()=>{ $('fn-input').focus(); $('fn-input').select(); }, 60);
+}
+
+function closeModal(){ $('fn-overlay').style.display='none'; _dlPending=null; }
+
+function confirmDownload(){
+  if(!_dlPending) return;
+  let name = $('fn-input').value.trim();
+  if(!name){
+    $('fn-hint').textContent='⚠ Please enter a filename.';
+    $('fn-hint').style.color='var(--red)';
+    $('fn-input').focus();
+    return;
+  }
+  // Sanitise — keep alphanumeric, dash, underscore, dot
+  name = name.replace(/[^a-zA-Z0-9._\-]/g, '_');
+  // Ensure correct extension
+  if(!name.endsWith(_dlPending.ext)) name = name.replace(/\.[^.]*$/, '') + _dlPending.ext;
+  const full = name;
+  closeModal();
+  triggerDL(_dlPending.content, full, _dlPending.isText);
+  toast('Downloaded: ' + full, 'ok');
+}
+
+// Modal button wiring
+$('fn-confirm').addEventListener('click', confirmDownload);
+$('fn-cancel').addEventListener('click', closeModal);
+$('fn-overlay').addEventListener('click', e=>{ if(e.target===$('fn-overlay')) closeModal(); });
+$('fn-input').addEventListener('keydown', e=>{
+  if(e.key==='Enter') confirmDownload();
+  if(e.key==='Escape') closeModal();
+  // reset hint colour on typing
+  $('fn-hint').style.color='';
+  $('fn-hint').textContent='Letters, numbers, hyphens and underscores only.';
+});
+
+/* ─── Drop zone setup ─── */
+function setupDrop(zoneId, inputId, cb){
+  const zone=$(zoneId), input=$(inputId);
+  ['dragenter','dragover'].forEach(e=>{
+    zone.addEventListener(e,ev=>{ev.preventDefault();zone.classList.add('drag-over');});
+  });
+  ['dragleave','drop'].forEach(e=>{
+    zone.addEventListener(e,ev=>{ev.preventDefault();zone.classList.remove('drag-over');});
+  });
+  zone.addEventListener('drop',e=>{
+    const f=e.dataTransfer?.files;
+    if(f&&f.length) cb(f);
+  });
+  input.addEventListener('change',e=>{
+    if(e.target.files.length) cb(e.target.files);
+  });
+}
+
+/* ─── Quality sliders ─── */
+$('enc-quality').addEventListener('input',e=>{
+  $('enc-quality-val').textContent=e.target.value+'%';
+});
+$('batch-quality').addEventListener('input',e=>{
+  $('batch-quality-val').textContent=e.target.value+'%';
+});
+
+/* ================================================================
+   TAB SWITCHING
+================================================================ */
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    $('panel-'+t.dataset.tab).classList.add('active');
+  });
+});
+
+/* ================================================================
+   ENCODE — single file
+================================================================ */
+function encClear(){
+  hide($('enc-result'));hide($('enc-error'));hide($('enc-raw-wrap'));
+  hide($('enc-prog-wrap'));
+  S.enc.frdContent=null;
+}
+
+function encError(msg){
+  $('enc-error-msg').textContent=msg;
+  show($('enc-error'));hide($('enc-result'));
+  toast(msg,'err');
+}
+
+setupDrop('enc-drop','enc-input', files => handleEncFile(files[0]));
+
+async function handleEncFile(file){
+  const allowed=['image/png','image/jpeg','image/webp'];
+  if(!allowed.includes(file.type)){
+    encError(`Unsupported type: ${file.type||'unknown'}. Use PNG, JPG, or WEBP.`);return;
+  }
+  S.enc.file=file;
+  encClear();
+  const dataURL=await readDataURL(file);
+  S.enc.dataURL=dataURL;
+  const dims=await getDims(dataURL).catch(()=>null);
+  if(!dims){encError('Cannot read image dimensions — file may be corrupted.');return;}
+  S.enc.w=dims.w; S.enc.h=dims.h;
+  $('enc-img').src=dataURL;
+  $('enc-meta').innerHTML=
+    metaItem('Filename',file.name)+
+    metaItem('Type',file.type)+
+    metaItem('Size',fmtSize(file.size))+
+    metaItem('Dimensions',`${dims.w}×${dims.h}`);
+  show($('enc-preview-wrap'));
+  revEl($('enc-actions'),true);
+}
+
+$('enc-btn').addEventListener('click', async ()=>{
+  if(!S.enc.file) return;
+  const btn=$('enc-btn'), lbl=$('enc-btn-lbl'), spn=$('enc-spinner');
+  btn.disabled=true; show(spn); lbl.textContent='ENCODING…'; encClear();
+  const t0=performance.now();
+  try{
+    await animProg('enc-prog-bar','enc-prog-pct','enc-prog-wrap','enc-prog-label',0,35,400,'Reading image…');
+    const quality=parseInt($('enc-quality').value);
+    const key = $('enc-key').value.trim();
+    const compressed=await compressImage(S.enc.dataURL, S.enc.file.type, quality);
+    await animProg('enc-prog-bar','enc-prog-pct','enc-prog-wrap','enc-prog-label',35,65,350,'Compressing…');
+    let base64=compressed.split(',')[1];
+    if(key){
+      await animProg('enc-prog-bar','enc-prog-pct','enc-prog-wrap','enc-prog-label',65,80,250,'Encrypting…');
+      base64 = xorBase64(base64, key);
+    }
+    const ts=Date.now();
+    const outMime=(S.enc.file.type==='image/png')?'image/png':
+                  (S.enc.file.type==='image/webp')?'image/webp':'image/jpeg';
+    const frd=buildFRD(S.enc.file.name, outMime, S.enc.w, S.enc.h, quality, base64, ts, !!key);
+    S.enc.frdContent=frd;
+    S.enc.outName=S.enc.file.name.replace(/\.[^.]+$/,'')+'.frd';
+    await animProg('enc-prog-bar','enc-prog-pct','enc-prog-wrap','enc-prog-label',80,100,250,'Building FRD…');
+    const elapsed=((performance.now()-t0)/1000).toFixed(2);
+    const outSize=new Blob([frd]).size;
+    $('enc-result-detail').textContent=
+      `File:      ${S.enc.outName}\nSize:      ${fmtSize(outSize)} (original: ${fmtSize(S.enc.file.size)})\nQuality:   ${quality}%\nEncrypted: ${key?'YES 🔑':'No'}\nTime:      ${elapsed}s`;
+    show($('enc-result'));
+    // Raw preview
+    $('enc-raw-box').innerHTML=highlightFRD(frd);
+    show($('enc-raw-wrap'));
+    toast(key ? 'Encoded + Encrypted to .FRD 🔑' : 'Encoded to .FRD','ok');
+  }catch(err){encError(err.message);}
+  finally{btn.disabled=false;hide(spn);lbl.textContent='ENCODE → .FRD';}
+});
+
+$('enc-dl').addEventListener('click',()=>{
+  if(!S.enc.frdContent) return;
+  askAndDownload(S.enc.frdContent, S.enc.outName, true, '.frd', 'Name your .frd file:');
+});
+
+$('enc-reset').addEventListener('click',()=>{
+  S.enc={file:null,dataURL:null,frdContent:null,outName:null,w:0,h:0};
+  $('enc-input').value='';
+  hide($('enc-preview-wrap'));revEl($('enc-actions'),false);encClear();
+});
+
+// Raw toggle
+let encRawOpen=true;
+$('enc-raw-toggle').addEventListener('click',()=>{
+  encRawOpen=!encRawOpen;
+  $('enc-raw-box').style.display=encRawOpen?'':'none';
+  $('enc-raw-toggle').textContent=encRawOpen?'COLLAPSE':'EXPAND';
+});
+
+/* ================================================================
+   BATCH ENCODE
+================================================================ */
+let batchFrdResults=[];
+
+function batchClear(){
+  hide($('batch-result'));hide($('batch-error'));
+  hide($('batch-prog-wrap'));
+  batchFrdResults=[];
+}
+
+setupDrop('batch-drop','batch-input', files => handleBatchFiles(files));
+
+async function handleBatchFiles(fileList){
+  const allowed=['image/png','image/jpeg','image/webp'];
+  S.batch.files=[];
+  const rows=$('batch-rows');
+  rows.innerHTML='';
+  batchClear();
+
+  for(const f of fileList){
+    if(!allowed.includes(f.type)) continue;
+    S.batch.files.push(f);
+    const row=document.createElement('div');
+    row.className='batch-item';
+    row.id='brow-'+S.batch.files.length;
+    row.innerHTML=`<span class="batch-fname">${f.name}</span><span class="batch-size">${fmtSize(f.size)}</span><span class="batch-status waiting" id="bstat-${S.batch.files.length}">WAITING</span>`;
+    rows.appendChild(row);
+  }
+
+  if(S.batch.files.length===0){
+    $('batch-error-msg').textContent='No supported images found. Use PNG, JPG, or WEBP.';
+    show($('batch-error'));return;
+  }
+
+  show($('batch-list'));
+  revEl($('batch-actions'),true);
+}
+
+$('batch-btn').addEventListener('click', async ()=>{
+  if(!S.batch.files.length) return;
+  const btn=$('batch-btn'), lbl=$('batch-btn-lbl'), spn=$('batch-spinner');
+  btn.disabled=true; show(spn); lbl.textContent='CONVERTING…'; batchClear();
+  const quality=parseInt($('batch-quality').value);
+  const key = $('batch-key').value.trim();
+  const t0=performance.now();
+  batchFrdResults=[];
+  let success=0, fail=0;
+
+  show($('batch-prog-wrap'));
+
+  for(let i=0;i<S.batch.files.length;i++){
+    const f=S.batch.files[i];
+    const statEl=$('bstat-'+(i+1));
+    if(statEl){statEl.textContent='WORKING';statEl.className='batch-status converting';}
+
+    try{
+      const dataURL=await readDataURL(f);
+      const dims=await getDims(dataURL);
+      const compressed=await compressImage(dataURL, f.type, quality);
+      let base64=compressed.split(',')[1];
+      if(key) base64 = xorBase64(base64, key);
+      const outMime=(f.type==='image/png')?'image/png':
+                    (f.type==='image/webp')?'image/webp':'image/jpeg';
+      const ts=Date.now();
+      const frd=buildFRD(f.name, outMime, dims.w, dims.h, quality, base64, ts, !!key);
+      const outName=f.name.replace(/\.[^.]+$/,'')+'.frd';
+      batchFrdResults.push({frd, outName, ok:true});
+      if(statEl){statEl.textContent='DONE';statEl.className='batch-status done';}
+      success++;
+    }catch(e){
+      batchFrdResults.push({ok:false, name:f.name, err:e.message});
+      if(statEl){statEl.textContent='ERROR';statEl.className='batch-status error';}
+      fail++;
+    }
+
+    // update progress bar
+    const pct=Math.round(((i+1)/S.batch.files.length)*100);
+    $('batch-prog-bar').style.width=pct+'%';
+    $('batch-prog-pct').textContent=pct+'%';
+    $('batch-prog-label').textContent=`Converting ${i+1}/${S.batch.files.length}…`;
+    // allow UI to breathe
+    await new Promise(r=>setTimeout(r,30));
+  }
+
+  const elapsed=((performance.now()-t0)/1000).toFixed(2);
+  $('batch-result-detail').textContent=`Converted: ${success}  Failed: ${fail}  Time: ${elapsed}s  Quality: ${quality}%  Encrypted: ${key?'YES 🔑':'No'}`;
+  show($('batch-result'));
+
+  // Build download buttons
+  const dlGroup=$('batch-dl-group');
+  dlGroup.innerHTML='';
+  batchFrdResults.filter(r=>r.ok).forEach(r=>{
+    const b=document.createElement('button');
+    b.className='btn btn-green';
+    b.textContent='⬇ '+r.outName;
+    b.addEventListener('click',()=>{
+      askAndDownload(r.frd, r.outName, true, '.frd', 'Name your .frd file:');
+    });
+    dlGroup.appendChild(b);
+  });
+
+  toast(`Batch done — ${success} files converted${key?' 🔑':''}`, 'ok');
+  btn.disabled=false; hide(spn); lbl.textContent='⚡ CONVERT ALL';
+});
+
+$('batch-reset').addEventListener('click',()=>{
+  S.batch.files=[];
+  $('batch-input').value='';
+  $('batch-rows').innerHTML='';
+  hide($('batch-list'));revEl($('batch-actions'),false);batchClear();
+});
+
+/* ================================================================
+   DECODE — .frd → image
+================================================================ */
+function decClear(){
+  hide($('dec-result'));hide($('dec-error'));hide($('dec-raw-wrap'));
+  hide($('dec-prog-wrap'));hide($('dec-preview-wrap'));
+  S.dec.dataURL=null;S.dec.outName=null;S.dec.outMime=null;
+}
+
+function decError(msg){
+  $('dec-error-msg').textContent=msg;
+  show($('dec-error'));hide($('dec-result'));
+  toast(msg,'err');
+}
+
+setupDrop('dec-drop','dec-input', files => handleDecFile(files[0]));
+
+async function handleDecFile(file){
+  if(!file.name.endsWith('.frd')){
+    decError('Invalid extension. Only .frd files are accepted.');return;
+  }
+  S.dec.file=file;
+  decClear();
+  revEl($('dec-actions'),true);
+  toast('FRD loaded — press Decode','inf');
+}
+
+$('dec-btn').addEventListener('click', async ()=>{
+  if(!S.dec.file) return;
+  const btn=$('dec-btn'), lbl=$('dec-btn-lbl'), spn=$('dec-spinner');
+  btn.disabled=true; show(spn); lbl.textContent='DECODING…'; decClear();
+  const t0=performance.now();
+  try{
+    await animProg('dec-prog-bar','dec-prog-pct','dec-prog-wrap','dec-prog-label',0,30,350,'Reading file…');
+    const txt=await readText(S.dec.file);
+
+    // Validation
+    if(!txt||txt.trim()==='') throw new Error('File is empty.');
+    if(!txt.startsWith('FRD-V1')) throw new Error('Invalid header. Expected "FRD-V1". This is not a valid .frd file.');
+    if(!txt.includes('DATA_START')) throw new Error('Missing DATA_START marker. File may be corrupted.');
+    if(!txt.includes('DATA_END')) throw new Error('Missing DATA_END marker. File appears incomplete.');
+
+    await animProg('dec-prog-bar','dec-prog-pct','dec-prog-wrap','dec-prog-label',30,60,300,'Parsing metadata…');
+
+    // Parse metadata
+    const meta={};
+    const lines=txt.split('\n');
+    for(const line of lines){
+      const t=line.trim();
+      if(t==='DATA_START') break;
+      if(t.includes('=')){const idx=t.indexOf('=');meta[t.substring(0,idx).trim()]=t.substring(idx+1).trim();}
+    }
+
+    // Extract base64
+    const dsIdx=txt.indexOf('DATA_START\n')+'DATA_START\n'.length;
+    const deIdx=txt.indexOf('\nDATA_END');
+    if(deIdx<=dsIdx) throw new Error('Malformed data block between DATA_START and DATA_END.');
+    let base64=txt.substring(dsIdx,deIdx).trim();
+    if(!base64||base64.length<20) throw new Error('Image data is missing or too short.');
+
+    // Apply decryption key if file was encrypted
+    const key = $('dec-key').value.trim();
+    const wasEncrypted = meta['encrypted']==='true';
+    if(wasEncrypted || key){
+      await animProg('dec-prog-bar','dec-prog-pct','dec-prog-wrap','dec-prog-label',60,80,250,'Decrypting…');
+      // Always apply key (even if wrong — wrong key = corrupted output, not error)
+      base64 = xorBase64(base64, key);
+    }
+
+    await animProg('dec-prog-bar','dec-prog-pct','dec-prog-wrap','dec-prog-label',80,90,250,'Rebuilding image…');
+
+    const mime=meta['type']||'image/png';
+    const dataURL=`data:${mime};base64,${base64}`;
+
+    // Try to validate image — if key was wrong, image may fail to load
+    // We show it anyway as corrupted output (don't throw on error)
+    let imageValid = true;
+    try{
+      await new Promise((res,rej)=>{
+        const img=new Image();
+        img.onload=res;
+        img.onerror=rej;
+        img.src=dataURL;
+      });
+    }catch{
+      imageValid = false;
+      // If completely unreadable (totally wrong base64), build a visual noise image
+      const noiseURL = buildNoiseImage(
+        parseInt(meta['width'])||400,
+        parseInt(meta['height'])||300
+      );
+      S.dec.dataURL=noiseURL;
+      S.dec.outMime='image/png';
+      S.dec.outName='corrupted_'+(meta['filename']||'image.png');
+      $('dec-img').src=noiseURL;
+    }
+
+    if(imageValid){
+      S.dec.dataURL=dataURL;
+      S.dec.outMime=mime;
+      S.dec.outName=meta['filename']||('restored.'+mime.split('/')[1]);
+      $('dec-img').src=dataURL;
+    }
+
+    await animProg('dec-prog-bar','dec-prog-pct','dec-prog-wrap','dec-prog-label',90,100,200,'Done!');
+
+    const approxSize=Math.round(base64.length*0.75);
+    const keyStatus = wasEncrypted
+      ? (key ? (imageValid ? '🔑 Key applied' : '❌ Wrong key — corrupted') : '⚠ No key entered')
+      : '—';
+
+    $('dec-meta').innerHTML=
+      metaItem('Original file', meta['filename']||'—')+
+      metaItem('Type',          meta['type']||'—')+
+      metaItem('Dimensions',    (meta['width']&&meta['height'])?`${meta['width']}×${meta['height']}`:'—')+
+      metaItem('Quality',       meta['quality']?meta['quality']+'%':'—')+
+      metaItem('Created',       meta['created']?fmtDate(meta['created']):'—')+
+      metaItem('Key status',    keyStatus);
+    show($('dec-preview-wrap'));
+
+    // Raw
+    $('dec-raw-box').innerHTML=highlightFRD(txt);
+    show($('dec-raw-wrap'));
+
+    const elapsed=((performance.now()-t0)/1000).toFixed(2);
+    $('dec-result-detail').textContent=
+      `Restored: ${S.dec.outName}\nSize:     ${fmtSize(approxSize)}\nTime:     ${elapsed}s\nKey:      ${wasEncrypted?(key?'Applied':'Missing — image corrupted'):'Not encrypted'}`;
+    show($('dec-result'));
+
+    if(!imageValid || (wasEncrypted && !key)){
+      toast('⚠ Wrong or missing key — corrupted image shown', 'err');
+    } else {
+      toast(wasEncrypted ? 'Image decrypted & restored 🔑' : 'Image restored from .FRD', 'ok');
+    }
+
+  }catch(err){decError(err.message);}
+  finally{btn.disabled=false;hide(spn);lbl.textContent='DECODE .FRD';}
+});
+
+$('dec-dl').addEventListener('click',()=>{
+  if(!S.dec.dataURL||!S.dec.outName) return;
+  const ext = '.'+( S.dec.outMime ? S.dec.outMime.split('/')[1] : 'png' );
+  askAndDownload(S.dec.dataURL, S.dec.outName, false, ext, 'Name your restored image:');
+});
+
+$('dec-tab').addEventListener('click',()=>{
+  if(!S.dec.dataURL) return;
+  const w=window.open();
+  w.document.write(`<body style="margin:0;background:#000"><img src="${S.dec.dataURL}" style="max-width:100%;display:block;margin:auto"></body>`);
+  w.document.title=S.dec.outName||'Restored Image';
+});
+
+$('dec-reset').addEventListener('click',()=>{
+  S.dec={file:null,dataURL:null,outName:null,outMime:null};
+  $('dec-input').value='';
+  revEl($('dec-actions'),false);decClear();
+});
+
+// Raw toggle decode
+let decRawOpen=true;
+$('dec-raw-toggle').addEventListener('click',()=>{
+  decRawOpen=!decRawOpen;
+  $('dec-raw-box').style.display=decRawOpen?'':'none';
+  $('dec-raw-toggle').textContent=decRawOpen?'COLLAPSE':'EXPAND';
+});
+
+/* ================================================================
+   NOISE IMAGE — shown when key is wrong and base64 is unreadable
+================================================================ */
+function buildNoiseImage(w, h){
+  const capped_w = Math.min(w, 800);
+  const capped_h = Math.min(h, 600);
+  const cv = document.createElement('canvas');
+  cv.width = capped_w; cv.height = capped_h;
+  const ctx = cv.getContext('2d');
+  const id = ctx.createImageData(capped_w, capped_h);
+  const d = id.data;
+  // Fill with pseudo-random colored noise — deliberately chaotic
+  let s = 0xDEADBEEF;
+  for(let i=0;i<d.length;i+=4){
+    s ^= s<<13; s=s>>>0; s^=s>>17; s=s>>>0; s^=s<<5; s=s>>>0;
+    d[i]   = s & 0xFF;
+    d[i+1] = (s>>8) & 0xFF;
+    d[i+2] = (s>>16) & 0xFF;
+    d[i+3] = 255;
+  }
+  ctx.putImageData(id, 0, 0);
+  // Overlay a "WRONG KEY" watermark
+  ctx.fillStyle='rgba(255,45,120,0.75)';
+  ctx.font=`bold ${Math.max(18, Math.floor(capped_w/12))}px monospace`;
+  ctx.textAlign='center';
+  ctx.textBaseline='middle';
+  ctx.fillText('⚠ WRONG KEY', capped_w/2, capped_h/2 - 14);
+  ctx.font=`${Math.max(11, Math.floor(capped_w/22))}px monospace`;
+  ctx.fillStyle='rgba(200,216,240,0.65)';
+  ctx.fillText('Image could not be recovered', capped_w/2, capped_h/2 + 18);
+  return cv.toDataURL('image/png');
+}
+
+/* ================================================================
+   KEY TOGGLE SETUP
+================================================================ */
+setupKeyToggle('enc-key','enc-key-toggle');
+setupKeyToggle('batch-key','batch-key-toggle');
+setupKeyToggle('dec-key','dec-key-toggle');
+
+</script>
+</body>
+</html>
