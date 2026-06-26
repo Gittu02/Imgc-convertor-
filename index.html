@@ -1617,8 +1617,10 @@ function confirmDownload(){
   // Ensure correct extension
   if(!name.endsWith(_dlPending.ext)) name = name.replace(/\.[^.]*$/, '') + _dlPending.ext;
   const full = name;
+  // Save before closeModal() nulls _dlPending
+  const { content, isText } = _dlPending;
   closeModal();
-  triggerDL(_dlPending.content, full, _dlPending.isText);
+  triggerDL(content, full, isText);
   toast('Downloaded: ' + full, 'ok');
 }
 
